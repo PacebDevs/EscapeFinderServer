@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - ./uploads:/app/src/uploads
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/escapefinderdb
+      - REDIS_URL=redis://cache:6379
+      - PORT=3000
+    depends_on:
+      - db
+      - cache
+
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: escapefinderdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./dump_escape_finder.sql:/docker-entrypoint-initdb.d/dump.sql
+
+  cache:
+    image: redis:7
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
