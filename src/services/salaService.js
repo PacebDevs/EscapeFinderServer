@@ -11,14 +11,20 @@ exports.getFilteredSalas = async (filters) => {
   }
 
   console.log('🐘 Cache MISS - consultando PostgreSQL');
+
   let query = `
-    SELECT s.*, l.nombre AS nombre_local, d.*, e.nombre AS empresa,
-           tr.nombre AS tipo_reserva,
-           ARRAY_AGG(DISTINCT c.nombre) AS categorias,
-           ARRAY_AGG(DISTINCT i.nombre) AS idiomas,
-           ARRAY_AGG(DISTINCT po.nombre) AS publico_objetivo,
-           ARRAY_AGG(DISTINCT r.nombre) AS restricciones,
-           ARRAY_AGG(DISTINCT dis.nombre) AS discapacidades
+    SELECT 
+      s.*, 
+      l.nombre AS nombre_local, 
+      d.*, 
+      e.nombre AS empresa,
+      tr.nombre AS tipo_reserva,
+      s.cover_url,  -- ✅ URL portada directamente desde la tabla sala
+      ARRAY_AGG(DISTINCT c.nombre) AS categorias,
+      ARRAY_AGG(DISTINCT i.nombre) AS idiomas,
+      ARRAY_AGG(DISTINCT po.nombre) AS publico_objetivo,
+      ARRAY_AGG(DISTINCT r.nombre) AS restricciones,
+      ARRAY_AGG(DISTINCT dis.nombre) AS discapacidades
     FROM sala s
     JOIN local l ON s.id_local = l.id_local
     LEFT JOIN empresa e ON e.id_empresa = l.id_empresa
@@ -79,7 +85,9 @@ exports.getFilteredSalas = async (filters) => {
   query += ` GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva`;
 
   const { rows } = await db.query(query, values);
-  await redis.set(cacheKey, JSON.stringify(rows), { EX: 600 }); // 10 minutos
+
+  await redis.set(cacheKey, JSON.stringify(rows), { EX: 600 }); // cache 10 minutos
+
   return rows;
 };
 

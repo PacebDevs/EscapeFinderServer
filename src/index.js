@@ -3,7 +3,7 @@ const cors = require('cors');
 const salaRoutes = require('./routes/salaRoutes');
 const http = require('http');
 const { Server } = require('socket.io');
-
+const path = require('path');
 const app = express();
 const server = http.createServer(app);
 
@@ -30,6 +30,8 @@ app.use(cors({
 
 app.use(express.json());
 app.use('/api/salas', salaRoutes);
+app.use('/salas', express.static(path.join(__dirname, 'uploads/salas')));
+
 
 // Socket.io con la misma configuración de CORS
 const io = new Server(server, {
