@@ -19,7 +19,7 @@ exports.getFilteredSalas = async (filters) => {
       d.*, 
       e.nombre AS empresa,
       tr.nombre AS tipo_reserva,
-      s.cover_url,  -- ✅ URL portada directamente desde la tabla sala
+      s.cover_url,
       ARRAY_AGG(DISTINCT c.nombre) AS categorias,
       ARRAY_AGG(DISTINCT i.nombre) AS idiomas,
       ARRAY_AGG(DISTINCT po.nombre) AS publico_objetivo,
@@ -46,6 +46,27 @@ exports.getFilteredSalas = async (filters) => {
   const values = [];
   let idx = 1;
 
+  // 🎯 Búsqueda por nombre de sala o empresa
+  if (filters.query) {
+    query += ` AND (LOWER(s.nombre) LIKE $${idx} OR LOWER(e.nombre) LIKE $${idx})`;
+    values.push(`%${filters.query.toLowerCase()}%`);
+    idx++;
+  }
+
+  // 🎯 Filtro múltiple por categorías (conversión de string a array)
+  if (filters.categorias) {
+    if (typeof filters.categorias === 'string') {
+      filters.categorias = filters.categorias.split(',').map(c => c.trim());
+    }
+
+    if (Array.isArray(filters.categorias) && filters.categorias.length > 0) {
+      const placeholders = filters.categorias.map(() => `$${idx++}`);
+      query += ` AND c.nombre IN (${placeholders.join(', ')})`;
+      values.push(...filters.categorias);
+    }
+  }
+
+  // 🧠 Filtros tradicionales (opcional)
   const likeFilters = {
     nombre: 's.nombre',
     descripcion: 's.descripcion',
@@ -86,7 +107,7 @@ exports.getFilteredSalas = async (filters) => {
 
   const { rows } = await db.query(query, values);
 
-  await redis.set(cacheKey, JSON.stringify(rows), { EX: 600 }); // cache 10 minutos
+  await redis.set(cacheKey, JSON.stringify(rows), { EX: 600 });
 
   return rows;
 };
