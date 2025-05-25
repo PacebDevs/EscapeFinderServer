@@ -3,7 +3,16 @@ const redis = require('../cache/redisClient');
 const { io } = require('../socket');
 
 exports.getFilteredSalas = async (filters) => {
-  const cacheKey = `salas:${JSON.stringify(filters)}`;
+  const normalizedFilters = {
+    query: filters.query || '',
+    categorias: Array.isArray(filters.categorias) ? [...filters.categorias].sort() : [],
+    limit: Number(filters.limit) || 20,
+    offset: Number(filters.offset) || 0,
+    orden: filters.orden || 'nombre',
+  };
+
+  const cacheKey = `salas:${JSON.stringify(normalizedFilters)}`;
+
   const cached = await redis.get(cacheKey);
   if (cached) {
     console.log('⚡ Cache HIT - usando Redis');
@@ -11,6 +20,12 @@ exports.getFilteredSalas = async (filters) => {
   }
 
   console.log('🐘 Cache MISS - consultando PostgreSQL');
+
+  const values = [];
+  let idx = 1;
+
+  const ordenValido = ['nombre', 'dificultad', 'tiempo'];
+  const campoOrden = ordenValido.includes(normalizedFilters.orden) ? normalizedFilters.orden : 'nombre';
 
   let query = `
     SELECT 
@@ -43,67 +58,28 @@ exports.getFilteredSalas = async (filters) => {
     WHERE 1=1
   `;
 
-  const values = [];
-  let idx = 1;
-
-  // 🎯 Búsqueda por nombre de sala o empresa
-  if (filters.query) {
+  if (normalizedFilters.query) {
     query += ` AND (LOWER(s.nombre) LIKE $${idx} OR LOWER(e.nombre) LIKE $${idx})`;
-    values.push(`%${filters.query.toLowerCase()}%`);
+    values.push(`%${normalizedFilters.query.toLowerCase()}%`);
     idx++;
   }
 
-  // 🎯 Filtro múltiple por categorías (conversión de string a array)
-  if (filters.categorias) {
-    if (typeof filters.categorias === 'string') {
-      filters.categorias = filters.categorias.split(',').map(c => c.trim());
-    }
-
-    if (Array.isArray(filters.categorias) && filters.categorias.length > 0) {
-      const placeholders = filters.categorias.map(() => `$${idx++}`);
-      query += ` AND c.nombre IN (${placeholders.join(', ')})`;
-      values.push(...filters.categorias);
-    }
+  if (normalizedFilters.categorias.length > 0) {
+    const placeholders = normalizedFilters.categorias.map(() => `$${idx++}`);
+    query += ` AND LOWER(c.nombre) IN (${placeholders.join(', ')})`;
+    values.push(...normalizedFilters.categorias.map(c => c.toLowerCase()));
   }
 
-  // 🧠 Filtros tradicionales (opcional)
-  const likeFilters = {
-    nombre: 's.nombre',
-    descripcion: 's.descripcion',
-    dificultad: 's.dificultad',
-    tiempo: 's.tiempo',
-    jugadores_min: 's.jugadores_min',
-    jugadores_max: 's.jugadores_max',
-    actores: 's.actores',
-    experiencia_por_jugador: 's.experiencia_por_jugador',
-    tipo_reserva: 'tr.nombre',
-    nombre_local: 'l.nombre',
-    telefono_local: 'l.telefono',
-    email_local: 'l.email',
-    web_local: 'l.web',
-    tipo_via: 'd.tipo_via',
-    nombre_via: 'd.nombre_via',
-    numero: 'd.numero',
-    ampliacion: 'd.ampliacion',
-    codigo_postal: 'd.codigo_postal',
-    ciudad: 'd.ciudad',
-    codigo_google: 'd.codigo_google',
-    categoria: 'c.nombre',
-    idioma: 'i.nombre',
-    publico_objetivo: 'po.nombre',
-    restriccion: 'r.nombre',
-    discapacidad: 'dis.nombre',
-    empresa: 'e.nombre'
-  };
+  query += `
+    GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva
+    ORDER BY s.${campoOrden} ASC
+    LIMIT $${idx++} OFFSET $${idx++}
+  `;
 
-  for (const [key, column] of Object.entries(likeFilters)) {
-    if (filters[key]) {
-      query += ` AND ${column} ILIKE $${idx++}`;
-      values.push(`%${filters[key]}%`);
-    }
-  }
+  values.push(normalizedFilters.limit, normalizedFilters.offset);
 
-  query += ` GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva`;
+  console.log('📤 Query ejecutada con filtros:', normalizedFilters);
+  console.log(query);
 
   const { rows } = await db.query(query, values);
 
@@ -111,6 +87,8 @@ exports.getFilteredSalas = async (filters) => {
 
   return rows;
 };
+
+
 
 
 exports.getSalaById = async (id_sala) => {
@@ -149,7 +127,6 @@ exports.getSalaById = async (id_sala) => {
   const { rows } = await db.query(query, values);
   return rows[0] || null;
 };
-
 
 exports.flushSalaCache = async () => {
   console.log('🧹 Intentando limpiar cache de salas...');
