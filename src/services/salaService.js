@@ -11,7 +11,13 @@ exports.getFilteredSalas = async (filters) => {
     orden: filters.orden || 'nombre',
   };
 
-  const cacheKey = `salas:${JSON.stringify(normalizedFilters)}`;
+  const orderedFilters = Object.keys(normalizedFilters)
+  .sort()
+  .reduce((obj, key) => {
+    obj[key] = normalizedFilters[key];
+    return obj;
+  }, {});
+const cacheKey = `salas:${JSON.stringify(orderedFilters)}`;
 
   const cached = await redis.get(cacheKey);
   if (cached) {
@@ -84,7 +90,7 @@ exports.getFilteredSalas = async (filters) => {
   const { rows } = await db.query(query, values);
 
   await redis.set(cacheKey, JSON.stringify(rows), { EX: 600 });
-
+console.log('📤 PostgreSQL respondió:', rows.length, 'salas');
   return rows;
 };
 
