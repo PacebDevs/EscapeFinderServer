@@ -12,6 +12,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/escapefinderdb
       - REDIS_URL=redis://cache:6379
       - PORT=3000
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
     depends_on:
       - db
       - cache

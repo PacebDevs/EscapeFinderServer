@@ -8,15 +8,15 @@ router.get('/', async (req, res) => {
 
     if (query) {
       const ciudad = await locationService.getCityFromQuery(query);
-      return res.json({ ciudad });
+      return res.json([ciudad]);
     }
 
     if (lat && lng) {
       const ciudad = await locationService.getCityFromCoords(parseFloat(lat), parseFloat(lng));
-      return res.json({ ciudad });
+      return res.json([ciudad]);
     }
 
-    res.status(400).json({ error: 'Par\xE1metros incorrectos' });
+    res.status(400).json({ error: 'Parámetros incorrectos' });
   } catch (err) {
     console.error(err);
     res.status(err.status || 500).json({ error: err.message || 'Error interno' });
