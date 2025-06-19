@@ -31,7 +31,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use('/api/salas', salaRoutes);
-app.use('/ubicacion', ubicacionRoutes);
+app.use('/api/ubicacion', ubicacionRoutes);
 app.use('/salas', express.static(path.join(__dirname, 'uploads/salas')));
 
 
