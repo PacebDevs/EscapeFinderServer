@@ -36,6 +36,8 @@ exports.autocomplete = async (input) => {
       language: 'es',
       key: process.env.GOOGLE_API_KEY,
       components: 'country:es'
+          //radius: 50000, // más resultados
+    //strictbounds: false // sin recortar por límites artificiales
     }
   });
 
