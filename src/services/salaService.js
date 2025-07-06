@@ -3,13 +3,15 @@ const redis = require('../cache/redisClient');
 const { io } = require('../socket');
 
 exports.getFilteredSalas = async (filters) => {
-  const normalizedFilters = {
-    query: filters.query || '',
-    categorias: Array.isArray(filters.categorias) ? [...filters.categorias].sort() : [],
-    limit: Number(filters.limit) || 20,
-    offset: Number(filters.offset) || 0,
-    orden: filters.orden || 'nombre',
-  };
+const normalizedFilters = {
+  query: filters.query || '',
+  ciudad: filters.ciudad?.toLowerCase().trim() || '', // 🔍 AÑADIDO
+  categorias: Array.isArray(filters.categorias) ? [...filters.categorias].sort() : [],
+  limit: Number(filters.limit) || 20,
+  offset: Number(filters.offset) || 0,
+  orden: filters.orden || 'nombre',
+};
+
 
   const orderedFilters = Object.keys(normalizedFilters)
   .sort()
@@ -75,7 +77,11 @@ const cacheKey = `salas:${JSON.stringify(orderedFilters)}`;
     query += ` AND LOWER(c.nombre) IN (${placeholders.join(', ')})`;
     values.push(...normalizedFilters.categorias.map(c => c.toLowerCase()));
   }
-
+  if (normalizedFilters.ciudad) {
+    query += ` AND LOWER(d.ciudad) = $${idx}`;
+    values.push(normalizedFilters.ciudad);
+    idx++;
+  }
   query += `
     GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva
     ORDER BY s.${campoOrden} ASC

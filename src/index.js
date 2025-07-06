@@ -14,8 +14,13 @@ const allowedOrigins = [
   'http://192.168.1.131:8100', // live-reload en dispositivo real
   'http://localhost',          // emulador Android
   'capacitor://localhost',     // Capacitor WebView iOS/Android
-  'ionic://localhost'          // variante en algunas versiones
+  'ionic://localhost',          // variante en algunas versiones
+  'http://192.168.1.201:8100'
 ];
+
+if (process.env.USE_NGROK === 'true' && process.env.NGROK_URL) {
+  allowedOrigins.push(process.env.NGROK_URL);
+}
 
 // Middleware CORS para Express
 app.use(cors({
