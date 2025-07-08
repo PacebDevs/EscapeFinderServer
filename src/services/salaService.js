@@ -3,10 +3,20 @@ const redis = require('../cache/redisClient');
 const { io } = require('../socket');
 
 exports.getFilteredSalas = async (filters) => {
+
 const normalizedFilters = {
   query: filters.query || '',
-  ciudad: filters.ciudad?.toLowerCase().trim() || '', // 🔍 AÑADIDO
+  ciudad: filters.ciudad?.toLowerCase().trim() || '',
   categorias: Array.isArray(filters.categorias) ? [...filters.categorias].sort() : [],
+  jugadores: Number(filters.jugadores) || null,
+  precio: {
+    min: Number(filters.precio?.min) || 0,
+    max: Number(filters.precio?.max) || 9999
+  },
+  distancia: {
+    min: Number(filters.distancia?.min) || 0,
+    max: Number(filters.distancia?.max) || 999
+  },
   limit: Number(filters.limit) || 20,
   offset: Number(filters.offset) || 0,
   orden: filters.orden || 'nombre',
@@ -82,6 +92,23 @@ const cacheKey = `salas:${JSON.stringify(orderedFilters)}`;
     values.push(normalizedFilters.ciudad);
     idx++;
   }
+  if (normalizedFilters.jugadores) {
+  query += ` AND $${idx} BETWEEN s.jugadores_min AND s.jugadores_max`;
+  values.push(normalizedFilters.jugadores);
+  idx++;
+}
+
+/*if (normalizedFilters.precio.min !== undefined && normalizedFilters.precio.max !== undefined) {
+  query += ` AND s.precio_min >= $${idx} AND s.precio_max <= $${idx + 1}`;
+  values.push(normalizedFilters.precio.min, normalizedFilters.precio.max);
+  idx += 2;
+}*/
+
+/*if (normalizedFilters.distancia.min !== undefined && normalizedFilters.distancia.max !== undefined) {
+  query += ` AND s.distancia_max_aprox BETWEEN $${idx} AND $${idx + 1}`;
+  values.push(normalizedFilters.distancia.min, normalizedFilters.distancia.max);
+  idx += 2;
+}*/
   query += `
     GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva
     ORDER BY s.${campoOrden} ASC
