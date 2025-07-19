@@ -13,16 +13,21 @@ const normalizedFilters = {
     min: Number(filters.precio?.min) || 0,
     max: Number(filters.precio?.max) || 9999
   },
-  distancia: {
-    min: Number(filters.distancia?.min) || 0,
-    max: Number(filters.distancia?.max) || 999
+  distancia: filters.distancia_km || null,
+  coordenadas:{
+    lat: Number(filters.lat) || null,
+    lng: Number(filters.lng) || null
   },
   limit: Number(filters.limit) || 20,
   offset: Number(filters.offset) || 0,
   orden: filters.orden || 'nombre',
 };
 
-
+const usarCoordenadas = (
+  normalizedFilters.distancia &&
+  normalizedFilters.coordenadas.lat &&
+  normalizedFilters.coordenadas.lng
+);
   const orderedFilters = Object.keys(normalizedFilters)
   .sort()
   .reduce((obj, key) => {
@@ -87,7 +92,8 @@ const cacheKey = `salas:${JSON.stringify(orderedFilters)}`;
     query += ` AND LOWER(c.nombre) IN (${placeholders.join(', ')})`;
     values.push(...normalizedFilters.categorias.map(c => c.toLowerCase()));
   }
-  if (normalizedFilters.ciudad) {
+
+  if (!usarCoordenadas && normalizedFilters.ciudad) {
     query += ` AND LOWER(d.ciudad) = $${idx}`;
     values.push(normalizedFilters.ciudad);
     idx++;
@@ -103,12 +109,29 @@ const cacheKey = `salas:${JSON.stringify(orderedFilters)}`;
   values.push(normalizedFilters.precio.min, normalizedFilters.precio.max);
   idx += 2;
 }*/
+// 🌍 Distancia por coordenadas usando earth_distance + ll_to_earth (requiere extensiones cube + earthdistance)
+// NOTA: PostgreSQL espera distancia en METROS (por eso se multiplica por 1000)
+if (usarCoordenadas) {
 
-/*if (normalizedFilters.distancia.min !== undefined && normalizedFilters.distancia.max !== undefined) {
-  query += ` AND s.distancia_max_aprox BETWEEN $${idx} AND $${idx + 1}`;
-  values.push(normalizedFilters.distancia.min, normalizedFilters.distancia.max);
-  idx += 2;
-}*/
+  const latIdx = idx++;
+  const lngIdx = idx++;
+  const distIdx = idx++;
+
+  query += `
+    AND earth_distance(
+      ll_to_earth($${latIdx}, $${lngIdx}),
+      ll_to_earth(d.latitud, d.longitud)
+    ) <= $${distIdx}
+  `;
+
+  values.push(
+    normalizedFilters.coordenadas.lat,
+    normalizedFilters.coordenadas.lng,
+    normalizedFilters.distancia * 1000 // en metros
+  );
+}
+
+
   query += `
     GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva
     ORDER BY s.${campoOrden} ASC
