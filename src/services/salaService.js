@@ -8,33 +8,72 @@ const normalizedFilters = {
   query: filters.query || '',
   ciudad: filters.ciudad?.toLowerCase().trim() || '',
   categorias: Array.isArray(filters.categorias) ? [...filters.categorias].sort() : [],
-  jugadores: Number(filters.jugadores) || null,
+
+jugadores: Number.isFinite(Number(filters.jugadores)) ? Number(filters.jugadores) : null,
+ /*jugadores: (Number.isFinite(Number(filters.jugadores)) && Number(filters.jugadores) > 0) 
+    ? Number(filters.jugadores) 
+    : null,*/
+
   precio: {
     min: Number(filters.precio?.min) || 0,
     max: Number(filters.precio?.max) || 9999
   },
   distancia: filters.distancia_km || null,
-  coordenadas:{
+ /* coordenadas:{
     lat: Number(filters.lat) || null,
     lng: Number(filters.lng) || null
-  },
+  },*/
+  coordenadas: {
+  lat: Number.isFinite(Number(filters.lat)) ? Number(filters.lat) : null,
+  lng: Number.isFinite(Number(filters.lng)) ? Number(filters.lng) : null
+},
   limit: Number(filters.limit) || 20,
   offset: Number(filters.offset) || 0,
   orden: filters.orden || 'nombre',
 };
-
+console.log(filters.jugadores + 'Pruebaaaaaaa')
 const usarCoordenadas = (
   normalizedFilters.distancia &&
   normalizedFilters.coordenadas.lat &&
   normalizedFilters.coordenadas.lng
 );
-  const orderedFilters = Object.keys(normalizedFilters)
+
+
+function deepClean(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(deepClean).filter(v => v !== null && v !== undefined);
+  } else if (typeof obj === 'object' && obj !== null) {
+    const cleaned = Object.entries(obj).reduce((acc, [key, val]) => {
+      const cleanedVal = deepClean(val);
+      if (
+        cleanedVal !== null &&
+        cleanedVal !== undefined &&
+        (typeof cleanedVal !== 'object' || Object.keys(cleanedVal).length > 0)
+      ) {
+        acc[key] = cleanedVal;
+      }
+      return acc;
+    }, {});
+    return cleaned;
+  }
+  return obj;
+}
+
+// Aplica esto justo después de normalizedFilters
+const cleanedFilters = deepClean(normalizedFilters);
+
+const orderedFilters = Object.keys(cleanedFilters)
   .sort()
   .reduce((obj, key) => {
-    obj[key] = normalizedFilters[key];
+    obj[key] = cleanedFilters[key];
     return obj;
   }, {});
+
 const cacheKey = `salas:${JSON.stringify(orderedFilters)}`;
+console.log('→ BACKEND - filtros RAW:', filters);
+console.log('→ normalizedFilters:', normalizedFilters);
+console.log('→ cleanedFilters:', cleanedFilters);
+console.log('→ cacheKey:', cacheKey);
 
   const cached = await redis.get(cacheKey);
   if (cached) {
@@ -98,7 +137,7 @@ const cacheKey = `salas:${JSON.stringify(orderedFilters)}`;
     values.push(normalizedFilters.ciudad);
     idx++;
   }
-  if (normalizedFilters.jugadores) {
+if (normalizedFilters.jugadores !== null) {
   query += ` AND $${idx} BETWEEN s.jugadores_min AND s.jugadores_max`;
   values.push(normalizedFilters.jugadores);
   idx++;
@@ -141,11 +180,15 @@ if (usarCoordenadas) {
   values.push(normalizedFilters.limit, normalizedFilters.offset);
 
   console.log('📤 Query ejecutada con filtros:', normalizedFilters);
+  console.log('🔥 RAW filters:', filters);
   console.log(query);
 
   const { rows } = await db.query(query, values);
 
-  await redis.set(cacheKey, JSON.stringify(rows), { EX: 600 });
+  //await redis.set(cacheKey, JSON.stringify(rows), { EX: 600 });
+  await redis.set(cacheKey, JSON.stringify(rows), {
+  EX: normalizedFilters.jugadores !== null ? 600 : 60
+  });
 console.log('📤 PostgreSQL respondió:', rows.length, 'salas');
   return rows;
 };
