@@ -9,20 +9,13 @@ const normalizedFilters = {
   ciudad: filters.ciudad?.toLowerCase().trim() || '',
   categorias: Array.isArray(filters.categorias) ? [...filters.categorias].sort() : [],
 
-jugadores: Number.isFinite(Number(filters.jugadores)) ? Number(filters.jugadores) : null,
- /*jugadores: (Number.isFinite(Number(filters.jugadores)) && Number(filters.jugadores) > 0) 
-    ? Number(filters.jugadores) 
-    : null,*/
-
+  jugadores: Number.isFinite(Number(filters.jugadores)) ? Number(filters.jugadores) : null,
+  tipo_sala: filters.tipo_sala.toLowerCase().trim() || '',
   precio: {
     min: Number(filters.precio?.min) || 0,
     max: Number(filters.precio?.max) || 9999
   },
   distancia: filters.distancia_km || null,
- /* coordenadas:{
-    lat: Number(filters.lat) || null,
-    lng: Number(filters.lng) || null
-  },*/
   coordenadas: {
   lat: Number.isFinite(Number(filters.lat)) ? Number(filters.lat) : null,
   lng: Number.isFinite(Number(filters.lng)) ? Number(filters.lng) : null
@@ -95,6 +88,7 @@ console.log('→ cacheKey:', cacheKey);
       l.nombre AS nombre_local, 
       d.*, 
       e.nombre AS empresa,
+      tr.nombre AS tipo_sala,
       tr.nombre AS tipo_reserva,
       s.cover_url,
       ARRAY_AGG(DISTINCT c.nombre) AS categorias,
@@ -130,6 +124,11 @@ console.log('→ cacheKey:', cacheKey);
     const placeholders = normalizedFilters.categorias.map(() => `$${idx++}`);
     query += ` AND LOWER(c.nombre) IN (${placeholders.join(', ')})`;
     values.push(...normalizedFilters.categorias.map(c => c.toLowerCase()));
+  }
+  if (normalizedFilters.tipo_sala) {
+    query += ` AND LOWER(s.tipo_sala) = $${idx}`;
+    values.push(normalizedFilters.tipo_sala.toLowerCase());
+    idx++;
   }
 
   if (!usarCoordenadas && normalizedFilters.ciudad) {
