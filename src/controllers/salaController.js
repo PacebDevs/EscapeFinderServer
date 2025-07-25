@@ -17,10 +17,13 @@ exports.getFilteredSalas = async (req, res) => {
       filters.precio = { min: isNaN(min) ? 0 : min, max: isNaN(max) ? 9999 : max };
     }*/
    
-    if (filters.tipo_sala && typeof filters.tipo_sala === 'string') {
-      filters.tipo_sala = filters.tipo_sala.trim();
+    if (filters.tipo_sala) {
+      if (Array.isArray(filters.tipo_sala)) {
+        filters.tipo_sala = filters.tipo_sala.map(t => t.trim());
+      } else if (typeof filters.tipo_sala === 'string') {
+        filters.tipo_sala = filters.tipo_sala.split(',').map(t => t.trim());
+      }
     }
-
     const salas = await salaService.getFilteredSalas(filters);
     res.json(salas);
   } catch (error) {

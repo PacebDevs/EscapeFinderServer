@@ -10,7 +10,9 @@ const normalizedFilters = {
   categorias: Array.isArray(filters.categorias) ? [...filters.categorias].sort() : [],
 
   jugadores: Number.isFinite(Number(filters.jugadores)) ? Number(filters.jugadores) : null,
-  tipo_sala: filters.tipo_sala.toLowerCase().trim() || '',
+   tipo_sala: Array.isArray(filters.tipo_sala)
+    ? filters.tipo_sala.map(t => t.toLowerCase().trim()).filter(Boolean)
+    : [],
   precio: {
     min: Number(filters.precio?.min) || 0,
     max: Number(filters.precio?.max) || 9999
@@ -95,7 +97,8 @@ console.log('→ cacheKey:', cacheKey);
       ARRAY_AGG(DISTINCT i.nombre) AS idiomas,
       ARRAY_AGG(DISTINCT po.nombre) AS publico_objetivo,
       ARRAY_AGG(DISTINCT r.nombre) AS restricciones,
-      ARRAY_AGG(DISTINCT dis.nombre) AS discapacidades
+      ARRAY_AGG(DISTINCT dis.nombre) AS discapacidades,
+      ARRAY_AGG(DISTINCT ts.nombre) AS tipo_sala
     FROM sala s
     JOIN local l ON s.id_local = l.id_local
     LEFT JOIN empresa e ON e.id_empresa = l.id_empresa
@@ -111,6 +114,8 @@ console.log('→ cacheKey:', cacheKey);
     LEFT JOIN restriccion r ON r.id_restriccion = sr.id_restriccion
     LEFT JOIN sala_discapacidad sd ON sd.id_sala = s.id_sala
     LEFT JOIN discapacidad dis ON dis.id_discapacidad = sd.id_discapacidad
+    LEFT JOIN sala_tipo_sala sts ON sts.id_sala = s.id_sala
+    LEFT JOIN tipo_sala ts ON ts.id_tipo_sala = sts.id_tipo_sala
     WHERE 1=1
   `;
 
@@ -125,10 +130,11 @@ console.log('→ cacheKey:', cacheKey);
     query += ` AND LOWER(c.nombre) IN (${placeholders.join(', ')})`;
     values.push(...normalizedFilters.categorias.map(c => c.toLowerCase()));
   }
-  if (normalizedFilters.tipo_sala) {
-    query += ` AND LOWER(s.tipo_sala) = $${idx}`;
-    values.push(normalizedFilters.tipo_sala.toLowerCase());
-    idx++;
+
+  if (normalizedFilters.tipo_sala.length > 0) {
+    const placeholders = normalizedFilters.tipo_sala.map(() => `$${idx++}`);
+    query += ` AND LOWER(ts.nombre) IN (${placeholders.join(', ')})`; 
+    values.push(...normalizedFilters.tipo_sala.map(t => t.toLowerCase()));
   }
 
   if (!usarCoordenadas && normalizedFilters.ciudad) {
@@ -136,11 +142,11 @@ console.log('→ cacheKey:', cacheKey);
     values.push(normalizedFilters.ciudad);
     idx++;
   }
-if (normalizedFilters.jugadores !== null) {
-  query += ` AND $${idx} BETWEEN s.jugadores_min AND s.jugadores_max`;
-  values.push(normalizedFilters.jugadores);
-  idx++;
-}
+  if (normalizedFilters.jugadores !== null) {
+    query += ` AND $${idx} BETWEEN s.jugadores_min AND s.jugadores_max`;
+    values.push(normalizedFilters.jugadores);
+    idx++;
+  }
 
 /*if (normalizedFilters.precio.min !== undefined && normalizedFilters.precio.max !== undefined) {
   query += ` AND s.precio_min >= $${idx} AND s.precio_max <= $${idx + 1}`;
@@ -208,7 +214,8 @@ exports.getSalaById = async (id_sala) => {
       ARRAY_AGG(DISTINCT i.nombre) AS idiomas,
       ARRAY_AGG(DISTINCT po.nombre) AS publico_objetivo,
       ARRAY_AGG(DISTINCT r.nombre) AS restricciones,
-      ARRAY_AGG(DISTINCT dis.nombre) AS discapacidades
+      ARRAY_AGG(DISTINCT dis.nombre) AS discapacidades,
+      ARRAY_AGG(DISTINCT ts.nombre) AS tipo_sala
     FROM sala s
     JOIN local l ON s.id_local = l.id_local
     LEFT JOIN empresa e ON e.id_empresa = l.id_empresa
@@ -224,6 +231,8 @@ exports.getSalaById = async (id_sala) => {
     LEFT JOIN restriccion r ON r.id_restriccion = sr.id_restriccion
     LEFT JOIN sala_discapacidad sd ON sd.id_sala = s.id_sala
     LEFT JOIN discapacidad dis ON dis.id_discapacidad = sd.id_discapacidad
+    LEFT JOIN sala_tipo_sala sts ON sts.id_sala = s.id_sala
+    LEFT JOIN tipo_sala ts ON ts.id_tipo_sala = sts.id_tipo_sala
     WHERE s.id_sala = $1
     GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva
   `;
