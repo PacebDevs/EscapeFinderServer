@@ -9,6 +9,18 @@ exports.getFilteredSalas = async (req, res) => {
     if (filters.categorias && typeof filters.categorias === 'string') {
       filters.categorias = filters.categorias.split(',').map(c => c.trim());
     }
+    if (filters.dificultad && typeof filters.dificultad === 'string') {
+      filters.dificultad = filters.dificultad.split(',').map(d => d.trim());
+    }
+    if (filters.accesibilidad && typeof filters.accesibilidad === 'string') {
+      filters.accesibilidad = filters.accesibilidad.split(',').map(a => a.trim());
+    }
+    if (filters.restricciones_aptas && typeof filters.restricciones_aptas === 'string') {
+      filters.restricciones_aptas = filters.restricciones_aptas.split(',').map(r => r.trim());
+    }
+    if (filters.publico_objetivo && typeof filters.publico_objetivo === 'string') {
+      filters.publico_objetivo = filters.publico_objetivo.split(',').map(p => p.trim());
+    }
     if (filters.jugadores && typeof filters.jugadores === 'string') {
       filters.jugadores = parseInt(filters.jugadores, 10);
     }

@@ -8,6 +8,12 @@ const normalizedFilters = {
   query: filters.query || '',
   ciudad: filters.ciudad?.toLowerCase().trim() || '',
   categorias: Array.isArray(filters.categorias) ? [...filters.categorias].sort() : [],
+  dificultad: Array.isArray(filters.dificultad) ? filters.dificultad.map(d => d.toLowerCase()) : [],
+  
+  // ✨ ANÁLISIS DE ESTA SECCIÓN
+  accesibilidad: Array.isArray(filters.accesibilidad) ? filters.accesibilidad : [],
+  restricciones_aptas: Array.isArray(filters.restricciones_aptas) ? filters.restricciones_aptas : [],
+  publico_objetivo: Array.isArray(filters.publico_objetivo) ? filters.publico_objetivo : [],
 
   jugadores: Number.isFinite(Number(filters.jugadores)) ? Number(filters.jugadores) : null,
    tipo_sala: Array.isArray(filters.tipo_sala)
@@ -95,50 +101,63 @@ console.log('→ cacheKey:', cacheKey);
       s.cover_url,
       ARRAY_AGG(DISTINCT c.nombre) AS categorias,
       ARRAY_AGG(DISTINCT i.nombre) AS idiomas,
-      ARRAY_AGG(DISTINCT po.nombre) AS publico_objetivo,
-      ARRAY_AGG(DISTINCT r.nombre) AS restricciones,
-      ARRAY_AGG(DISTINCT dis.nombre) AS discapacidades,
+      
+      -- Para la lista, solo mostramos las características que son TRUE
+      ARRAY_AGG(DISTINCT car.nombre) FILTER (WHERE car.tipo = 'publico_objetivo' AND sc.es_apta = true) AS publico_objetivo,
+      ARRAY_AGG(DISTINCT car.nombre) FILTER (WHERE car.tipo = 'restriccion' AND sc.es_apta = true) AS restricciones,
+      ARRAY_AGG(DISTINCT car.nombre) FILTER (WHERE car.tipo = 'accesibilidad' AND sc.es_apta = true) AS discapacidades,
+
       ARRAY_AGG(DISTINCT ts.nombre) AS tipo_sala
     FROM sala s
     JOIN local l ON s.id_local = l.id_local
     LEFT JOIN empresa e ON e.id_empresa = l.id_empresa
     LEFT JOIN direccion d ON d.id_local = l.id_local
     LEFT JOIN tipo_reserva tr ON tr.id_tipo_reserva = s.id_tipo_reserva
-    LEFT JOIN sala_categoria sc ON sc.id_sala = s.id_sala
-    LEFT JOIN categoria c ON c.id_categoria = sc.id_categoria
+    LEFT JOIN sala_categoria sc_cat ON sc_cat.id_sala = s.id_sala
+    LEFT JOIN categoria c ON c.id_categoria = sc_cat.id_categoria
     LEFT JOIN sala_idioma si ON si.id_sala = s.id_sala
     LEFT JOIN idioma i ON i.id_idioma = si.id_idioma
-    LEFT JOIN sala_publico_objetivo spo ON spo.id_sala = s.id_sala
-    LEFT JOIN publico_objetivo po ON po.id_publico_objetivo = spo.id_publico_objetivo
-    LEFT JOIN sala_restriccion sr ON sr.id_sala = s.id_sala
-    LEFT JOIN restriccion r ON r.id_restriccion = sr.id_restriccion
-    LEFT JOIN sala_discapacidad sd ON sd.id_sala = s.id_sala
-    LEFT JOIN discapacidad dis ON dis.id_discapacidad = sd.id_discapacidad
+    LEFT JOIN sala_caracteristica sc ON sc.id_sala = s.id_sala
+    LEFT JOIN caracteristicas car ON car.id_caracteristica = sc.id_caracteristica
     LEFT JOIN sala_tipo_sala sts ON sts.id_sala = s.id_sala
     LEFT JOIN tipo_sala ts ON ts.id_tipo_sala = sts.id_tipo_sala
     WHERE 1=1
   `;
 
   if (normalizedFilters.query) {
-    query += ` AND (LOWER(s.nombre) LIKE $${idx} OR LOWER(e.nombre) LIKE $${idx})`;
-    values.push(`%${normalizedFilters.query.toLowerCase()}%`);
+    // Usamos la función f_unaccent en la consulta
+    query += ` AND (LOWER(public.f_unaccent(s.nombre)) LIKE LOWER(public.f_unaccent($${idx})) OR LOWER(public.f_unaccent(e.nombre)) LIKE LOWER(public.f_unaccent($${idx})))`;
+    values.push(`%${normalizedFilters.query}%`); // Pasamos el valor con acentos, la DB se encarga
     idx++;
   }
 
   if (normalizedFilters.categorias.length > 0) {
-    const placeholders = normalizedFilters.categorias.map(() => `$${idx++}`);
-    query += ` AND LOWER(c.nombre) IN (${placeholders.join(', ')})`;
-    values.push(...normalizedFilters.categorias.map(c => c.toLowerCase()));
+    // Aplicamos f_unaccent a cada placeholder
+    const placeholders = normalizedFilters.categorias.map(() => `LOWER(public.f_unaccent($${idx++}))`);
+    query += ` AND LOWER(public.f_unaccent(c.nombre)) IN (${placeholders.join(', ')})`;
+    // Pasamos los valores originales, la DB se encarga de todo
+    values.push(...normalizedFilters.categorias);
+  }
+
+  if (normalizedFilters.dificultad.length > 0) {
+    // Aplicamos f_unaccent a cada placeholder
+    const placeholders = normalizedFilters.dificultad.map(() => `LOWER(public.f_unaccent($${idx++}))`);
+    query += ` AND LOWER(public.f_unaccent(s.dificultad)) IN (${placeholders.join(', ')})`;
+    // Pasamos los valores originales, la DB se encarga de todo
+    values.push(...normalizedFilters.dificultad);
   }
 
   if (normalizedFilters.tipo_sala.length > 0) {
-    const placeholders = normalizedFilters.tipo_sala.map(() => `$${idx++}`);
-    query += ` AND LOWER(ts.nombre) IN (${placeholders.join(', ')})`; 
-    values.push(...normalizedFilters.tipo_sala.map(t => t.toLowerCase()));
+    // Aplicamos f_unaccent a cada placeholder
+    const placeholders = normalizedFilters.tipo_sala.map(() => `LOWER(public.f_unaccent($${idx++}))`);
+    query += ` AND LOWER(public.f_unaccent(ts.nombre)) IN (${placeholders.join(', ')})`; 
+    // Pasamos los valores originales, la DB se encarga de todo
+    values.push(...normalizedFilters.tipo_sala);
   }
 
   if (!usarCoordenadas && normalizedFilters.ciudad) {
-    query += ` AND LOWER(d.ciudad) = $${idx}`;
+    // Usamos la función f_unaccent en la consulta
+    query += ` AND LOWER(public.f_unaccent(d.ciudad)) = $${idx}`;
     values.push(normalizedFilters.ciudad);
     idx++;
   }
@@ -146,6 +165,58 @@ console.log('→ cacheKey:', cacheKey);
     query += ` AND $${idx} BETWEEN s.jugadores_min AND s.jugadores_max`;
     values.push(normalizedFilters.jugadores);
     idx++;
+  }
+
+
+  // Lógica para ACCESIBILIDAD (Opt-in: debe tener es_apta = true)
+  if (normalizedFilters.accesibilidad.length > 0) {
+    const placeholders = normalizedFilters.accesibilidad.map(() => `LOWER(public.f_unaccent($${idx++}))`);
+    query += `
+      AND s.id_sala IN (
+        SELECT sc_sub.id_sala
+        FROM sala_caracteristica sc_sub
+        JOIN caracteristicas car_sub ON sc_sub.id_caracteristica = car_sub.id_caracteristica
+        WHERE LOWER(public.f_unaccent(car_sub.nombre)) IN (${placeholders.join(', ')})
+          AND sc_sub.es_apta = true
+        GROUP BY sc_sub.id_sala
+        HAVING COUNT(DISTINCT car_sub.id_caracteristica) = ${normalizedFilters.accesibilidad.length}
+      )
+    `;
+    values.push(...normalizedFilters.accesibilidad);
+  }
+
+  // Lógica para PUBLICO OBJETIVO (Opt-in: debe tener es_apta = true)
+  if (normalizedFilters.publico_objetivo.length > 0) {
+    const placeholders = normalizedFilters.publico_objetivo.map(() => `LOWER(public.f_unaccent($${idx++}))`);
+    query += `
+      AND s.id_sala IN (
+        SELECT sc_sub.id_sala
+        FROM sala_caracteristica sc_sub
+        JOIN caracteristicas car_sub ON sc_sub.id_caracteristica = car_sub.id_caracteristica
+        WHERE LOWER(public.f_unaccent(car_sub.nombre)) IN (${placeholders.join(', ')})
+          AND sc_sub.es_apta = true
+        GROUP BY sc_sub.id_sala
+        HAVING COUNT(DISTINCT car_sub.id_caracteristica) = ${normalizedFilters.publico_objetivo.length}
+      )
+    `;
+    values.push(...normalizedFilters.publico_objetivo);
+  }
+
+  // Lógica para RESTRICCIONES (Opt-out: NO debe tener es_apta = false)
+  if (normalizedFilters.restricciones_aptas.length > 0) {
+    for (const restriccion of normalizedFilters.restricciones_aptas) {
+      query += `
+        AND NOT EXISTS (
+          SELECT 1
+          FROM sala_caracteristica sc_sub
+          JOIN caracteristicas car_sub ON sc_sub.id_caracteristica = car_sub.id_caracteristica
+          WHERE sc_sub.id_sala = s.id_sala
+            AND LOWER(public.f_unaccent(car_sub.nombre)) = LOWER(public.f_unaccent($${idx++}))
+            AND sc_sub.es_apta = false
+        )
+      `;
+      values.push(restriccion);
+    }
   }
 
 /*if (normalizedFilters.precio.min !== undefined && normalizedFilters.precio.max !== undefined) {
@@ -212,9 +283,15 @@ exports.getSalaById = async (id_sala) => {
       s.cover_url,
       ARRAY_AGG(DISTINCT c.nombre) AS categorias,
       ARRAY_AGG(DISTINCT i.nombre) AS idiomas,
-      ARRAY_AGG(DISTINCT po.nombre) AS publico_objetivo,
-      ARRAY_AGG(DISTINCT r.nombre) AS restricciones,
-      ARRAY_AGG(DISTINCT dis.nombre) AS discapacidades,
+      
+      -- Devolvemos objetos JSON para ver el estado TRUE/FALSE de cada característica
+      jsonb_agg(DISTINCT jsonb_build_object('nombre', car.nombre, 'es_apta', sc.es_apta)) 
+        FILTER (WHERE car.tipo = 'publico_objetivo') AS publico_objetivo,
+      jsonb_agg(DISTINCT jsonb_build_object('nombre', car.nombre, 'es_apta', sc.es_apta)) 
+        FILTER (WHERE car.tipo = 'restriccion') AS restricciones,
+      jsonb_agg(DISTINCT jsonb_build_object('nombre', car.nombre, 'es_apta', sc.es_apta)) 
+        FILTER (WHERE car.tipo = 'accesibilidad') AS discapacidades,
+
       ARRAY_AGG(DISTINCT ts.nombre) AS tipo_sala
     FROM sala s
     JOIN local l ON s.id_local = l.id_local
