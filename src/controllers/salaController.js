@@ -21,6 +21,10 @@ exports.getFilteredSalas = async (req, res) => {
     if (filters.publico_objetivo && typeof filters.publico_objetivo === 'string') {
       filters.publico_objetivo = filters.publico_objetivo.split(',').map(p => p.trim());
     }
+    // ✅ idioma: solo un string, limpiar espacios
+    if (filters.idioma && typeof filters.idioma === 'string') {
+      filters.idioma = filters.idioma.trim();
+    }
     if (filters.jugadores && typeof filters.jugadores === 'string') {
       filters.jugadores = parseInt(filters.jugadores, 10);
     }

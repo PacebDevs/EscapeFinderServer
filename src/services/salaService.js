@@ -9,11 +9,13 @@ const normalizedFilters = {
   ciudad: filters.ciudad?.toLowerCase().trim() || '',
   categorias: Array.isArray(filters.categorias) ? [...filters.categorias].sort() : [],
   dificultad: Array.isArray(filters.dificultad) ? filters.dificultad.map(d => d.toLowerCase()) : [],
-  
-  // ✨ ANÁLISIS DE ESTA SECCIÓN
   accesibilidad: Array.isArray(filters.accesibilidad) ? filters.accesibilidad : [],
   restricciones_aptas: Array.isArray(filters.restricciones_aptas) ? filters.restricciones_aptas : [],
   publico_objetivo: Array.isArray(filters.publico_objetivo) ? filters.publico_objetivo : [],
+  idioma: (typeof filters.idioma === 'string') ? filters.idioma : '',
+
+  // ✨ CAMBIO: Solo nos importa si es explícitamente 'true'
+  actores: filters.actores === 'true',
 
   jugadores: Number.isFinite(Number(filters.jugadores)) ? Number(filters.jugadores) : null,
    tipo_sala: Array.isArray(filters.tipo_sala)
@@ -143,16 +145,22 @@ console.log('→ cacheKey:', cacheKey);
     // Aplicamos f_unaccent a cada placeholder
     const placeholders = normalizedFilters.dificultad.map(() => `LOWER(public.f_unaccent($${idx++}))`);
     query += ` AND LOWER(public.f_unaccent(s.dificultad)) IN (${placeholders.join(', ')})`;
-    // Pasamos los valores originales, la DB se encarga de todo
     values.push(...normalizedFilters.dificultad);
   }
 
-  if (normalizedFilters.tipo_sala.length > 0) {
-    // Aplicamos f_unaccent a cada placeholder
-    const placeholders = normalizedFilters.tipo_sala.map(() => `LOWER(public.f_unaccent($${idx++}))`);
-    query += ` AND LOWER(public.f_unaccent(ts.nombre)) IN (${placeholders.join(', ')})`; 
-    // Pasamos los valores originales, la DB se encarga de todo
-    values.push(...normalizedFilters.tipo_sala);
+  // 🔤 Filtro único de IDIOMA
+  if (normalizedFilters.idioma) {
+    const idiomaIdx = idx++;
+    query += `
+      AND EXISTS (
+        SELECT 1
+        FROM sala_idioma si2
+        JOIN idioma i2 ON i2.id_idioma = si2.id_idioma
+        WHERE si2.id_sala = s.id_sala
+          AND LOWER(public.f_unaccent(i2.nombre)) = LOWER(public.f_unaccent($${idiomaIdx}))
+      )
+    `;
+    values.push(normalizedFilters.idioma);
   }
 
   if (!usarCoordenadas && normalizedFilters.ciudad) {
@@ -167,6 +175,10 @@ console.log('→ cacheKey:', cacheKey);
     idx++;
   }
 
+  // ✨ CAMBIO: Lógica simplificada para el filtro de ACTORES
+  if (normalizedFilters.actores) { // Solo se aplica si el filtro es 'true'
+    query += ` AND s.actores = true`;
+  }
 
   // Lógica para ACCESIBILIDAD (Opt-in: debe tener es_apta = true)
   if (normalizedFilters.accesibilidad.length > 0) {
