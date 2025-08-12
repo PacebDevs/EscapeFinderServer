@@ -14,17 +14,16 @@ const normalizedFilters = {
   publico_objetivo: Array.isArray(filters.publico_objetivo) ? filters.publico_objetivo : [],
   idioma: (typeof filters.idioma === 'string') ? filters.idioma : '',
 
-  // ✨ CAMBIO: Solo nos importa si es explícitamente 'true'
   actores: filters.actores === 'true',
 
   jugadores: Number.isFinite(Number(filters.jugadores)) ? Number(filters.jugadores) : null,
-   tipo_sala: Array.isArray(filters.tipo_sala)
+  tipo_sala: Array.isArray(filters.tipo_sala)
     ? filters.tipo_sala.map(t => t.toLowerCase().trim()).filter(Boolean)
     : [],
-  precio: {
-    min: Number(filters.precio?.min) || 0,
-    max: Number(filters.precio?.max) || 9999
-  },
+
+  // 💶 precio por persona (umbral) - único valor desde el front
+  precio_pp: Number.isFinite(Number(filters.precio)) ? Number(filters.precio) : null,
+
   distancia: filters.distancia_km || null,
   coordenadas: {
   lat: Number.isFinite(Number(filters.lat)) ? Number(filters.lat) : null,
@@ -176,8 +175,55 @@ console.log('→ cacheKey:', cacheKey);
   }
 
   // ✨ CAMBIO: Lógica simplificada para el filtro de ACTORES
-  if (normalizedFilters.actores) { // Solo se aplica si el filtro es 'true'
+  if (normalizedFilters.actores) { // Solo se aplica si es 'true'
     query += ` AND s.actores = true`;
+  }
+
+  // 💶 Filtro de PRECIO por persona
+  if (normalizedFilters.precio_pp !== null) {
+    if (normalizedFilters.jugadores !== null) {
+      // Con nº de jugadores: usa precio exacto si existe; si no existe, cae a max_pp de la sala
+      const precioIdx = idx++;
+      const playersIdx = idx++;
+      query += `
+        AND (
+          EXISTS (
+            SELECT 1
+            FROM sala_precio sp
+            WHERE sp.id_sala = s.id_sala
+              AND sp.players = $${playersIdx}
+              AND sp.price_per_player <= $${precioIdx}
+          )
+          OR (
+            NOT EXISTS (
+              SELECT 1
+              FROM sala_precio sp2
+              WHERE sp2.id_sala = s.id_sala
+                AND sp2.players = $${playersIdx}
+            )
+            AND EXISTS (
+              SELECT 1
+              FROM sala_precio_minmax v
+              WHERE v.id_sala = s.id_sala
+                AND v.max_pp <= $${precioIdx}
+            )
+          )
+        )
+      `;
+      values.push(normalizedFilters.precio_pp, normalizedFilters.jugadores);
+    } else {
+      // Sin nº de jugadores: que su precio por persona NO supere el umbral -> max_pp <= precio
+      const precioIdx = idx++;
+      query += `
+        AND EXISTS (
+          SELECT 1
+          FROM sala_precio_minmax v2
+          WHERE v2.id_sala = s.id_sala
+            AND v2.max_pp <= $${precioIdx}
+        )
+      `;
+      values.push(normalizedFilters.precio_pp);
+    }
   }
 
   // Lógica para ACCESIBILIDAD (Opt-in: debe tener es_apta = true)

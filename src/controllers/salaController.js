@@ -28,10 +28,14 @@ exports.getFilteredSalas = async (req, res) => {
     if (filters.jugadores && typeof filters.jugadores === 'string') {
       filters.jugadores = parseInt(filters.jugadores, 10);
     }
-   /* if (filters.precio && typeof filters.precio === 'string') {
-      const [min, max] = filters.precio.split('-').map(p => parseFloat(p));
-      filters.precio = { min: isNaN(min) ? 0 : min, max: isNaN(max) ? 9999 : max };
-    }*/
+    
+    // 💶 precio por persona recibido como string único
+    if (typeof filters.precio === 'string') {
+      const n = parseFloat(filters.precio.replace(',', '.'));
+      if (!Number.isNaN(n)) filters.precio = n;
+      else delete filters.precio;
+    }
+  
    
     if (filters.tipo_sala) {
       if (Array.isArray(filters.tipo_sala)) {
