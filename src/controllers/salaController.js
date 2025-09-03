@@ -51,3 +51,22 @@ exports.getFilteredSalas = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener salas filtradas' });
   }
 };
+
+// 👉 NUEVO: obtener una sala por ID (con lat/lng opcionales)
+exports.getSalaById = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'ID inválido' });
+
+    const lat = req.query.lat !== undefined ? parseFloat(req.query.lat) : null;
+    const lng = req.query.lng !== undefined ? parseFloat(req.query.lng) : null;
+
+    const sala = await require('../services/salaService').getSalaById(id, lat, lng);
+    if (!sala) return res.status(404).json({ error: 'Sala no encontrada' });
+
+    res.json(sala);
+  } catch (err) {
+    console.error('❌ Error en getSalaById:', err);
+    res.status(500).json({ error: 'Error al obtener la sala' });
+  }
+};

@@ -91,9 +91,31 @@ console.log('→ cacheKey:', cacheKey);
   const ordenValido = ['nombre', 'dificultad', 'tiempo'];
   const campoOrden = ordenValido.includes(normalizedFilters.orden) ? normalizedFilters.orden : 'nombre';
 
+  // ✨ INICIO DEL CAMBIO: Guardar los índices de los parámetros
+  let distanciaSelect = 'NULL AS distancia_km,';
+  let latIdx, lngIdx; // Variables para guardar los índices
+
+  if (usarCoordenadas) {
+    latIdx = idx++; // Guardamos el índice actual para la latitud
+    lngIdx = idx++; // Guardamos el siguiente para la longitud
+
+    distanciaSelect = `
+      (earth_distance(
+        ll_to_earth($${latIdx}, $${lngIdx}),
+        ll_to_earth(d.latitud, d.longitud)
+      ) / 1000) AS distancia_km,
+    `;
+    values.push(normalizedFilters.coordenadas.lat, normalizedFilters.coordenadas.lng);
+    // No incrementamos 'idx' aquí porque ya lo hicimos al asignar latIdx y lngIdx
+  }
+  // ✨ FIN DEL CAMBIO
+
   let query = `
     SELECT 
       s.*, 
+      v.min_pp AS precio_min_pp,
+      v.max_pp AS precio_max_pp,
+      ${distanciaSelect} -- Aquí se inserta el cálculo o NULL
       l.nombre AS nombre_local, 
       d.*, 
       e.nombre AS empresa,
@@ -111,6 +133,7 @@ console.log('→ cacheKey:', cacheKey);
       ARRAY_AGG(DISTINCT ts.nombre) AS tipo_sala
     FROM sala s
     JOIN local l ON s.id_local = l.id_local
+    LEFT JOIN sala_precio_minmax v ON v.id_sala = s.id_sala
     LEFT JOIN empresa e ON e.id_empresa = l.id_empresa
     LEFT JOIN direccion d ON d.id_local = l.id_local
     LEFT JOIN tipo_reserva tr ON tr.id_tipo_reserva = s.id_tipo_reserva
@@ -286,8 +309,7 @@ console.log('→ cacheKey:', cacheKey);
 // NOTA: PostgreSQL espera distancia en METROS (por eso se multiplica por 1000)
 if (usarCoordenadas) {
 
-  const latIdx = idx++;
-  const lngIdx = idx++;
+  // ✨ CAMBIO: Usar los índices guardados en lugar de hardcodear 1 y 2
   const distIdx = idx++;
 
   query += `
@@ -298,15 +320,13 @@ if (usarCoordenadas) {
   `;
 
   values.push(
-    normalizedFilters.coordenadas.lat,
-    normalizedFilters.coordenadas.lng,
     normalizedFilters.distancia * 1000 // en metros
   );
 }
 
 
   query += `
-    GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva
+    GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva, v.min_pp, v.max_pp
     ORDER BY s.${campoOrden} ASC
     LIMIT $${idx++} OFFSET $${idx++}
   `;
@@ -329,61 +349,89 @@ console.log('📤 PostgreSQL respondió:', rows.length, 'salas');
 
 
 
+exports.getSalaById = async (id_sala, lat = null, lng = null) => {
+  const calcularDistancia = Number.isFinite(lat) && Number.isFinite(lng);
+  const values = [id_sala];
+  let idx = 2;
 
-exports.getSalaById = async (id_sala) => {
+  const distanciaSelect = calcularDistancia
+    ? `(earth_distance(ll_to_earth($${idx++}, $${idx++}), ll_to_earth(d.latitud, d.longitud)) / 1000) AS distancia_km,`
+    : `NULL AS distancia_km,`;
+
+  if (calcularDistancia) {
+    values.push(lat, lng);
+  }
+
   const query = `
     SELECT 
       s.*, 
+      ${distanciaSelect}
+      v.min_pp AS precio_min_pp,
+      v.max_pp AS precio_max_pp,
       l.nombre AS nombre_local, 
       d.*, 
       e.nombre AS empresa,
       tr.nombre AS tipo_reserva,
       s.cover_url,
+      s.descripcion_corta,
+
       ARRAY_AGG(DISTINCT c.nombre) AS categorias,
       ARRAY_AGG(DISTINCT i.nombre) AS idiomas,
-      
-      -- Devolvemos objetos JSON para ver el estado TRUE/FALSE de cada característica
-      jsonb_agg(DISTINCT jsonb_build_object('nombre', car.nombre, 'es_apta', sc.es_apta)) 
-        FILTER (WHERE car.tipo = 'publico_objetivo') AS publico_objetivo,
-      jsonb_agg(DISTINCT jsonb_build_object('nombre', car.nombre, 'es_apta', sc.es_apta)) 
-        FILTER (WHERE car.tipo = 'restriccion') AS restricciones,
-      jsonb_agg(DISTINCT jsonb_build_object('nombre', car.nombre, 'es_apta', sc.es_apta)) 
-        FILTER (WHERE car.tipo = 'accesibilidad') AS discapacidades,
+      ARRAY_AGG(DISTINCT ts.nombre) AS tipo_sala,
 
-      ARRAY_AGG(DISTINCT ts.nombre) AS tipo_sala
+      -- Características con estado TRUE/FALSE y tipo
+      jsonb_agg(DISTINCT jsonb_build_object(
+        'nombre', car.nombre,
+        'tipo', car.tipo,
+        'es_apta', sc.es_apta
+      )) AS caracteristicas,
+
+      -- Todas las imágenes
+      json_agg(DISTINCT jsonb_build_object(
+        'tipo', sim.tipo,
+        'url', sim.image_url
+      )) FILTER (WHERE sim.id_sala_imagen IS NOT NULL) AS imagenes
+
     FROM sala s
     JOIN local l ON s.id_local = l.id_local
     LEFT JOIN empresa e ON e.id_empresa = l.id_empresa
     LEFT JOIN direccion d ON d.id_local = l.id_local
     LEFT JOIN tipo_reserva tr ON tr.id_tipo_reserva = s.id_tipo_reserva
-    LEFT JOIN sala_categoria sc ON sc.id_sala = s.id_sala
-    LEFT JOIN categoria c ON c.id_categoria = sc.id_categoria
+    LEFT JOIN sala_categoria sc_cat ON sc_cat.id_sala = s.id_sala
+    LEFT JOIN categoria c ON c.id_categoria = sc_cat.id_categoria
     LEFT JOIN sala_idioma si ON si.id_sala = s.id_sala
     LEFT JOIN idioma i ON i.id_idioma = si.id_idioma
-    LEFT JOIN sala_publico_objetivo spo ON spo.id_sala = s.id_sala
-    LEFT JOIN publico_objetivo po ON po.id_publico_objetivo = spo.id_publico_objetivo
-    LEFT JOIN sala_restriccion sr ON sr.id_sala = s.id_sala
-    LEFT JOIN restriccion r ON r.id_restriccion = sr.id_restriccion
-    LEFT JOIN sala_discapacidad sd ON sd.id_sala = s.id_sala
-    LEFT JOIN discapacidad dis ON dis.id_discapacidad = sd.id_discapacidad
+    LEFT JOIN sala_caracteristica sc ON sc.id_sala = s.id_sala
+    LEFT JOIN caracteristicas car ON car.id_caracteristica = sc.id_caracteristica
     LEFT JOIN sala_tipo_sala sts ON sts.id_sala = s.id_sala
     LEFT JOIN tipo_sala ts ON ts.id_tipo_sala = sts.id_tipo_sala
+    LEFT JOIN sala_imagen sim ON sim.id_sala = s.id_sala
+    LEFT JOIN sala_precio_minmax v ON v.id_sala = s.id_sala
+
     WHERE s.id_sala = $1
-    GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva
+    GROUP BY 
+      s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva, v.min_pp, v.max_pp
   `;
-  const values = [id_sala];
+
   const { rows } = await db.query(query, values);
-  return rows[0] || null;
+  const sala = rows[0] || null;
+
+  if (!sala) return null;
+
+  // 🧾 Obtener precios por número de jugadores
+  const precioQuery = `
+    SELECT 
+      players AS jugadores,
+      price_total AS total,
+      price_per_player AS pp
+    FROM sala_precio
+    WHERE id_sala = $1
+    ORDER BY players ASC
+  `;
+  const { rows: precios } = await db.query(precioQuery, [id_sala]);
+
+  sala.precios_por_jugadores = precios;
+
+  return sala;
 };
 
-exports.flushSalaCache = async () => {
-  console.log('🧹 Intentando limpiar cache de salas...');
-  const keys = await redis.keys('salas:*');
-  if (keys.length > 0) {
-    await redis.del(keys);
-    console.log('♻️ Cache de salas invalidado');
-  } else {
-    console.log('ℹ️ No había claves de salas en cache');
-  }
-  io().emit('salasUpdated');
-};
