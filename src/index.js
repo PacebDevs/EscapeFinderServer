@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const salaRoutes = require('./routes/salaRoutes');
 const ubicacionRoutes = require('./routes/ubicacion');
+const mapRoutes = require('./routes/mapRoutes');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
@@ -37,7 +38,10 @@ app.use(cors({
 app.use(express.json());
 app.use('/api/salas', salaRoutes);
 app.use('/api/ubicacion', ubicacionRoutes);
+app.use('/api/maps', mapRoutes);
 app.use('/salas', express.static(path.join(__dirname, 'uploads/salas')));
+// Añadir esta línea para servir mapas estáticos
+app.use('/maps', express.static(path.join(__dirname, 'uploads/maps'))); // Añadir ruta estática para mapas
 
 
 // Socket.io con la misma configuración de CORS

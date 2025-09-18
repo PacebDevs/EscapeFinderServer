@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const redis = require('../cache/redisClient');
 const { io } = require('../socket');
+const mapService = require('./mapService');
 
 exports.getFilteredSalas = async (filters) => {
 
@@ -431,6 +432,25 @@ exports.getSalaById = async (id_sala, lat = null, lng = null) => {
   const { rows: precios } = await db.query(precioQuery, [id_sala]);
 
   sala.precios_por_jugadores = precios;
+  
+  // Añadir URL del mapa estático si la sala tiene coordenadas
+  if (sala.latitud && sala.longitud) {
+    try {
+      // Obtener la URL del mapa estático
+      const mapUrl = await mapService.getStaticMap(
+        sala.latitud, 
+        sala.longitud
+      );
+      
+      // Usar la URL completa para el frontend
+      sala.mapa_estatico_url = mapUrl;
+      
+      console.log(`🗺️ Mapa generado para sala ${id_sala}: ${mapUrl}`);
+    } catch (error) {
+      console.error(`❌ Error al generar mapa para sala ${id_sala}:`, error);
+      // Si falla, continuamos sin el mapa
+    }
+  }
 
   return sala;
 };
