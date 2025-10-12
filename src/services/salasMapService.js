@@ -38,9 +38,17 @@ exports.getSalasForMap = async (normalizedFilters) => {
       d.latitud,
       d.longitud,
       d.ciudad,
-      s.cover_url
+      d.tipo_via,
+      d.nombre_via,
+      d.numero,
+      d.ampliacion,
+      d.codigo_postal,
+      s.cover_url,
+      e.nombre AS nombre_empresa,
+      c.nombre AS categoria
     FROM sala s
     JOIN local l ON s.id_local = l.id_local
+    JOIN empresa e ON e.id_empresa = l.id_empresa
     LEFT JOIN sala_precio_minmax v ON v.id_sala = s.id_sala
     LEFT JOIN direccion d ON d.id_local = l.id_local
 
@@ -217,10 +225,11 @@ exports.getSalasForMap = async (normalizedFilters) => {
 
   // Agrupación mínima para evitar duplicados por los LEFT JOIN de filtros
   query += `
-    GROUP BY s.id_sala, d.id_direccion, v.min_pp
+    GROUP BY s.id_sala, d.id_direccion, d.tipo_via, d.nombre_via, d.numero, d.ampliacion, d.codigo_postal, v.min_pp, e.nombre, c.nombre
     ORDER BY s.nombre ASC
   `;
 
   const { rows } = await db.query(query, values);
+  console.log(`[SalasMapService] ${rows.length} salas encontradas para mapa con esos filtros.`);
   return rows; // Igual que devuelves en getFilteredSalas (un array de filas) :contentReference[oaicite:12]{index=12}
 };
