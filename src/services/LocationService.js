@@ -124,6 +124,7 @@ exports.geocode = async (description) => {
   }
 
   const result = data.results[0];
+  console.log('Geocode result:', result);
   const ciudad = extractCity([result]);
   const payload = {
     direccion: result.formatted_address,
