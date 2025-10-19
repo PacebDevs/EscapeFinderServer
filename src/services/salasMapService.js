@@ -33,6 +33,7 @@ exports.getSalasForMap = async (normalizedFilters) => {
     SELECT
       s.id_sala,
       s.nombre,
+      s.dificultad,
       ${distanciaSelect}
       v.min_pp AS precio_min_pp,
       d.latitud,
