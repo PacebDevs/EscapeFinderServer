@@ -9,4 +9,7 @@ router.post('/register', authController.register);
 // POST /api/auth/login
 router.post('/login', authController.login);
 
+// GET /api/auth/verify-email
+router.get('/verify-email', authController.verifyEmail);
+
 module.exports = router;

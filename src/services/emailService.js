@@ -6,11 +6,13 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
 async function enviarEmailVerificacion(usuario) {
-  // Generar JWT con expiración de 24 horas
   const token = jwt.sign(
     { 
       id_usuario: usuario.id_usuario,
@@ -24,7 +26,7 @@ async function enviarEmailVerificacion(usuario) {
   const urlVerificacion = `${process.env.BASE_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${token}`;
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: `"EscapeFinder" <${process.env.EMAIL_USER}>`,
     to: usuario.email,
     subject: 'Verifica tu cuenta - EscapeFinder',
     html: `
@@ -45,7 +47,14 @@ async function enviarEmailVerificacion(usuario) {
     `
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email enviado correctamente:', info.messageId);
+    return info;
+  } catch (error) {
+    console.error('❌ Error enviando email:', error.message);
+    throw error;
+  }
 }
 
 module.exports = {
