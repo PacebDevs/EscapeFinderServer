@@ -9,6 +9,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 const app = express();
 const server = http.createServer(app);
+const authRoutes = require('./routes/authRoutes');
 
 // Lista de orígenes permitidos
 const allowedOrigins = [
@@ -37,6 +38,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use('/api/auth', authRoutes);  
 app.use('/api/salas', salaRoutes);
 app.use('/api/ubicacion', ubicacionRoutes);
 app.use('/api/maps', mapRoutes);
