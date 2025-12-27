@@ -23,7 +23,7 @@ async function enviarEmailVerificacion(usuario) {
     { expiresIn: '24h' }
   );
 
-  const urlVerificacion = `${process.env.BASE_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${token}`;
+  const urlVerificacion = `${process.env.BASE_URL || 'http://localhost:3000'}/verify-email?token=${token}`;
 
   const mailOptions = {
     from: `"EscapeFinder" <${process.env.EMAIL_USER}>`,
@@ -57,6 +57,50 @@ async function enviarEmailVerificacion(usuario) {
   }
 }
 
+/**
+ * Envía email de recuperación de contraseña
+ */
+async function enviarEmailRecuperacion(usuario, token) {
+  const urlRecuperacion = `${process.env.BASE_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+
+  const mailOptions = {
+    from: `"EscapeFinder" <${process.env.EMAIL_USER}>`,
+    to: usuario.email,
+    subject: 'Recuperar contraseña - EscapeFinder',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Recuperación de contraseña</h2>
+        <p>Hola ${usuario.nombre || 'Usuario'},</p>
+        <p>Recibimos una solicitud para restablecer tu contraseña en EscapeFinder.</p>
+        <p>Haz clic en el botón para crear una nueva contraseña:</p>
+        <a href="${urlRecuperacion}" 
+           style="display: inline-block; padding: 12px 24px; background-color: #5d4037; 
+                  color: white; text-decoration: none; border-radius: 8px; margin: 20px 0;">
+          Restablecer Contraseña
+        </a>
+        <p>O copia este enlace en tu navegador:</p>
+        <p style="color: #666; word-break: break-all;">${urlRecuperacion}</p>
+        <p style="color: #999; font-size: 12px; margin-top: 30px;">
+          Este enlace expira en 1 hora. Si no solicitaste restablecer tu contraseña, ignora este correo.
+        </p>
+        <p style="color: #999; font-size: 12px;">
+          Por seguridad, nunca compartas este enlace con nadie.
+        </p>
+      </div>
+    `
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email de recuperación enviado:', info.messageId);
+    return info;
+  } catch (error) {
+    console.error('❌ Error enviando email de recuperación:', error.message);
+    throw error;
+  }
+}
+
 module.exports = {
-  enviarEmailVerificacion
+  enviarEmailVerificacion,
+  enviarEmailRecuperacion
 };

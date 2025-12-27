@@ -82,3 +82,77 @@ exports.verifyEmail = async (req, res) => {
     res.status(500).json({ error: 'Error al verificar email' });
   }
 };
+
+/**
+ * Solicitar recuperación de contraseña
+ */
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const result = await authService.forgotPassword(email);
+    res.json(result);
+  } catch (error) {
+    console.error('Error en forgot password:', error);
+    res.status(error.status || 500).json({ 
+      error: error.message || 'Error al procesar solicitud de recuperación' 
+    });
+  }
+};
+
+/**
+ * Resetear contraseña con token
+ */
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    const result = await authService.resetPassword(token, newPassword);
+    res.json(result);
+  } catch (error) {
+    console.error('Error en reset password:', error);
+    res.status(error.status || 500).json({ 
+      error: error.message || 'Error al restablecer contraseña' 
+    });
+  }
+};
+
+/**
+ * Login con Google OAuth
+ */
+exports.googleLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    const result = await authService.googleLogin(idToken);
+    res.json(result);
+  } catch (error) {
+    console.error('Error en Google login:', error);
+    res.status(error.status || 500).json({ 
+      error: error.message || 'Error en login con Google' 
+    });
+  }
+};
+
+/**
+ * Login con Apple OAuth
+ */
+exports.appleLogin = async (req, res) => {
+  try {
+    const { identityToken, user } = req.body;
+    const result = await authService.appleLogin(identityToken, user);
+    res.json(result);
+  } catch (error) {
+    console.error('Error en Apple login:', error);
+    res.status(error.status || 500).json({ 
+      error: error.message || 'Error en login con Apple' 
+    });
+  }
+};
+
+module.exports = {
+  register: exports.register,
+  login: exports.login,
+  verifyEmail: exports.verifyEmail,
+  forgotPassword: exports.forgotPassword,
+  resetPassword: exports.resetPassword,
+  googleLogin: exports.googleLogin,
+  appleLogin: exports.appleLogin
+};
