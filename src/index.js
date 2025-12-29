@@ -11,6 +11,7 @@ const db = require('./config/db');
 const app = express();
 const server = http.createServer(app);
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 // Lista de orígenes permitidos
 const allowedOrigins = [
@@ -41,7 +42,8 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use('/api/auth', authRoutes);  
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
 app.use('/api/salas', salaRoutes);
 app.use('/api/ubicacion', ubicacionRoutes);
 app.use('/api/maps', mapRoutes);

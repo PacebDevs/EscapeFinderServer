@@ -22,7 +22,8 @@ function normalizeEmail(email) {
 function generateToken(user) {
   return jwt.sign(
     {
-      sub: user.id_usuario,
+      id_usuario: user.id_usuario,
+      email: user.email,
       tipo: user.tipo,
       id_empresa: user.id_empresa || null,
     },

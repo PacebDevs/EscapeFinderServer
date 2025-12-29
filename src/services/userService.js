@@ -25,3 +25,52 @@ exports.getUserById = async (id) => {
 
   return null;
 };
+
+/**
+ * Actualizar perfil del usuario (nombre y apellidos)
+ */
+exports.updateProfile = async (userId, data) => {
+  const { nombre, apellidos } = data;
+
+  const result = await db.query(
+    `UPDATE usuario 
+     SET nombre = COALESCE($1, nombre), 
+         apellidos = COALESCE($2, apellidos)
+     WHERE id_usuario = $3
+     RETURNING id_usuario, email, nombre, apellidos, tipo, estado, email_verificado`,
+    [nombre, apellidos, userId]
+  );
+
+  if (result.rows.length === 0) {
+    throw { status: 404, message: 'Usuario no encontrado' };
+  }
+
+  // Invalidar cache
+  const key = `user:${userId}`;
+  await redis.del(key);
+
+  return result.rows[0];
+};
+
+/**
+ * Eliminar cuenta del usuario (eliminación permanente)
+ */
+exports.deleteAccount = async (userId) => {
+  // Eliminación permanente del registro
+  const result = await db.query(
+    `DELETE FROM usuario 
+     WHERE id_usuario = $1
+     RETURNING id_usuario, email`,
+    [userId]
+  );
+
+  if (result.rows.length === 0) {
+    throw { status: 404, message: 'Usuario no encontrado' };
+  }
+
+  // Invalidar cache
+  const key = `user:${userId}`;
+  await redis.del(key);
+
+  return result.rows[0];
+};
