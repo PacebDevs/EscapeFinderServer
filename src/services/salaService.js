@@ -25,6 +25,9 @@ const normalizedFilters = {
   // 💶 precio por persona (umbral) - único valor desde el front
   precio_pp: Number.isFinite(Number(filters.precio)) ? Number(filters.precio) : null,
 
+  // 🆔 Filtro por IDs específicos (para favoritos)
+  id_salas: Array.isArray(filters.id_salas) ? filters.id_salas : [],
+
   distancia: filters.distancia_km || null,
   coordenadas: {
   lat: Number.isFinite(Number(filters.lat)) ? Number(filters.lat) : null,
@@ -154,6 +157,13 @@ console.log('→ cacheKey:', cacheKey);
     query += ` AND (LOWER(public.f_unaccent(s.nombre)) LIKE LOWER(public.f_unaccent($${idx})) OR LOWER(public.f_unaccent(e.nombre)) LIKE LOWER(public.f_unaccent($${idx})))`;
     values.push(`%${normalizedFilters.query}%`); // Pasamos el valor con acentos, la DB se encarga
     idx++;
+  }
+
+  // 🆔 Filtro por IDs específicos (para favoritos)
+  if (normalizedFilters.id_salas.length > 0) {
+    const placeholders = normalizedFilters.id_salas.map(() => `$${idx++}`).join(', ');
+    query += ` AND s.id_sala IN (${placeholders})`;
+    values.push(...normalizedFilters.id_salas);
   }
 
   if (normalizedFilters.categorias.length > 0) {

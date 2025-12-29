@@ -12,10 +12,12 @@ const app = express();
 const server = http.createServer(app);
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+const favoritoRoutes = require('./routes/favoritoRoutes');
 
 // Lista de orígenes permitidos
 const allowedOrigins = [
-  'http://localhost:8100',     // ionic serve
+  'http://localhost:8100',     // ionic serve (puerto por defecto)
+  'http://localhost:8101',     // ionic serve (puerto alternativo)
   'http://192.168.1.131:8100', // live-reload en dispositivo real
   'http://localhost',          // emulador Android
   'capacitor://localhost',     // Capacitor WebView iOS/Android
@@ -44,6 +46,7 @@ app.use(cors({
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/favoritos', favoritoRoutes);
 app.use('/api/salas', salaRoutes);
 app.use('/api/ubicacion', ubicacionRoutes);
 app.use('/api/maps', mapRoutes);
