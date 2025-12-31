@@ -7,16 +7,21 @@ exports.getSalasForMap = async (normalizedFilters) => {
   const values = [];
   let idx = 1;
 
-  const usarCoordenadas = (
-    normalizedFilters.distancia &&
+  // ✅ Separar cálculo de distancia del filtrado
+  const tieneCoordenadas = (
     normalizedFilters.coordenadas.lat &&
     normalizedFilters.coordenadas.lng
-  ); // misma condición que en tu servicio :contentReference[oaicite:8]{index=8}
+  );
+
+  const filtrarPorDistancia = (
+    normalizedFilters.distancia &&
+    tieneCoordenadas
+  );
 
   // Distancia opcional (como en tu lista) y posibilidad de devolver distancia_km en SELECT
   let distanciaSelect = 'NULL AS distancia_km,';
   let latIdx, lngIdx;
-  if (usarCoordenadas) {
+  if (tieneCoordenadas) {
     latIdx = idx++;
     lngIdx = idx++;
     distanciaSelect = `
@@ -100,7 +105,7 @@ exports.getSalasForMap = async (normalizedFilters) => {
     values.push(normalizedFilters.idioma);
   }
 
-  if (!usarCoordenadas && normalizedFilters.ciudad) {
+  if (!filtrarPorDistancia && normalizedFilters.ciudad) {
     query += ` AND LOWER(public.f_unaccent(d.ciudad)) = $${idx}`;
     values.push(normalizedFilters.ciudad);
     idx++;
@@ -212,8 +217,8 @@ exports.getSalasForMap = async (normalizedFilters) => {
     }
   }
 
-  // Distancia por coordenadas (metros) — MISMO patrón que tu lista :contentReference[oaicite:11]{index=11}
-  if (usarCoordenadas) {
+  // Distancia por coordenadas (metros) - FILTRAR solo si se especificó
+  if (filtrarPorDistancia) {
     const distIdx = idx++;
     query += `
       AND earth_distance(

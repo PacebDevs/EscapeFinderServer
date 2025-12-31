@@ -38,10 +38,16 @@ const normalizedFilters = {
   orden: filters.orden || 'nombre',
 };
 console.log(filters.jugadores + 'Pruebaaaaaaa')
-const usarCoordenadas = (
-  normalizedFilters.distancia &&
+
+// ✅ Separar cálculo de distancia del filtrado
+const tieneCoordenadas = (
   normalizedFilters.coordenadas.lat &&
   normalizedFilters.coordenadas.lng
+);
+
+const filtrarPorDistancia = (
+  normalizedFilters.distancia &&
+  tieneCoordenadas
 );
 
 
@@ -95,11 +101,11 @@ console.log('→ cacheKey:', cacheKey);
   const ordenValido = ['nombre', 'dificultad', 'tiempo'];
   const campoOrden = ordenValido.includes(normalizedFilters.orden) ? normalizedFilters.orden : 'nombre';
 
-  // ✨ INICIO DEL CAMBIO: Guardar los índices de los parámetros
+  // ✅ Calcular distancia SIEMPRE que haya coordenadas
   let distanciaSelect = 'NULL AS distancia_km,';
   let latIdx, lngIdx; // Variables para guardar los índices
 
-  if (usarCoordenadas) {
+  if (tieneCoordenadas) {
     latIdx = idx++; // Guardamos el índice actual para la latitud
     lngIdx = idx++; // Guardamos el siguiente para la longitud
 
@@ -110,9 +116,7 @@ console.log('→ cacheKey:', cacheKey);
       ) / 1000) AS distancia_km,
     `;
     values.push(normalizedFilters.coordenadas.lat, normalizedFilters.coordenadas.lng);
-    // No incrementamos 'idx' aquí porque ya lo hicimos al asignar latIdx y lngIdx
   }
-  // ✨ FIN DEL CAMBIO
 
   let query = `
     SELECT 
@@ -196,7 +200,8 @@ console.log('→ cacheKey:', cacheKey);
     values.push(normalizedFilters.idioma);
   }
 
-  if (!usarCoordenadas && normalizedFilters.ciudad) {
+  // ✅ Si no se filtra por distancia, permitir filtro por ciudad
+  if (!filtrarPorDistancia && normalizedFilters.ciudad) {
     // Usamos la función f_unaccent en la consulta
     query += ` AND LOWER(public.f_unaccent(d.ciudad)) = $${idx}`;
     values.push(normalizedFilters.ciudad);
@@ -316,11 +321,9 @@ console.log('→ cacheKey:', cacheKey);
   values.push(normalizedFilters.precio.min, normalizedFilters.precio.max);
   idx += 2;
 }*/
-// 🌍 Distancia por coordenadas usando earth_distance + ll_to_earth (requiere extensiones cube + earthdistance)
-// NOTA: PostgreSQL espera distancia en METROS (por eso se multiplica por 1000)
-if (usarCoordenadas) {
 
-  // ✨ CAMBIO: Usar los índices guardados en lugar de hardcodear 1 y 2
+// 🌍 FILTRAR por distancia solo si se especificó (pero la distancia ya se calculó en el SELECT)
+if (filtrarPorDistancia) {
   const distIdx = idx++;
 
   query += `
