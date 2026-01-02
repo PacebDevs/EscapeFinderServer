@@ -35,6 +35,34 @@ exports.updateProfile = async (req, res) => {
 };
 
 /**
+ * Actualizar avatar del usuario autenticado
+ */
+exports.updateAvatar = async (req, res) => {
+  try {
+    const { avatar_url } = req.body;
+    const userId = req.user.id_usuario;
+
+    // Validar que el avatar_url sea válido
+    const validAvatars = ['candado', 'exploradora', 'hacker', 'ojo', 'reloj','inspector', 'SIN_AVATAR'];
+    if (!validAvatars.includes(avatar_url)) {
+      return res.status(400).json({ error: 'Avatar no válido' });
+    }
+
+    const updatedUser = await userService.updateAvatar(userId, avatar_url);
+    
+    res.json({ 
+      mensaje: 'Avatar actualizado correctamente',
+      user: updatedUser 
+    });
+  } catch (error) {
+    console.error('Error actualizando avatar:', error);
+    res.status(error.status || 500).json({ 
+      error: error.message || 'Error al actualizar avatar' 
+    });
+  }
+};
+
+/**
  * Solicitar reset de contraseña desde el perfil del usuario
  */
 exports.requestPasswordReset = async (req, res) => {

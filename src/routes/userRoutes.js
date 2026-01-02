@@ -9,6 +9,9 @@ router.get('/:id', userController.getUser);
 // PUT /api/user/profile - Actualizar perfil del usuario autenticado
 router.put('/profile', requireAuth, userController.updateProfile);
 
+// PUT /api/user/avatar - Actualizar avatar del usuario autenticado
+router.put('/avatar', requireAuth, userController.updateAvatar);
+
 // POST /api/user/request-password-reset - Solicitar reset de contraseña desde perfil
 router.post('/request-password-reset', requireAuth, userController.requestPasswordReset);
 

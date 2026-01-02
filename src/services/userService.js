@@ -37,8 +37,31 @@ exports.updateProfile = async (userId, data) => {
      SET nombre = COALESCE($1, nombre), 
          apellidos = COALESCE($2, apellidos)
      WHERE id_usuario = $3
-     RETURNING id_usuario, email, nombre, apellidos, tipo, estado, email_verificado`,
+     RETURNING id_usuario, email, nombre, apellidos, tipo, estado, email_verificado, avatar_url`,
     [nombre, apellidos, userId]
+  );
+
+  if (result.rows.length === 0) {
+    throw { status: 404, message: 'Usuario no encontrado' };
+  }
+
+  // Invalidar cache
+  const key = `user:${userId}`;
+  await redis.del(key);
+
+  return result.rows[0];
+};
+
+/**
+ * Actualizar avatar del usuario
+ */
+exports.updateAvatar = async (userId, avatarUrl) => {
+  const result = await db.query(
+    `UPDATE usuario 
+     SET avatar_url = $1
+     WHERE id_usuario = $2
+     RETURNING id_usuario, email, nombre, apellidos, tipo, estado, email_verificado, avatar_url`,
+    [avatarUrl, userId]
   );
 
   if (result.rows.length === 0) {

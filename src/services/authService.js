@@ -45,7 +45,8 @@ async function findUserByEmail(email) {
       tipo,
       estado,
       id_empresa,
-      email_verificado
+      email_verificado,
+      avatar_url
     FROM usuario
     WHERE f_unaccent(LOWER(email)) = f_unaccent(LOWER($1))
     LIMIT 1
@@ -99,7 +100,8 @@ async function login(email, password) {
     tipo: user.tipo,
     estado: user.estado,
     id_empresa: user.id_empresa,
-    email_verificado: user.email_verificado
+    email_verificado: user.email_verificado,
+    avatar_url: user.avatar_url
   };
 
   return { user: safeUser, token };
@@ -136,7 +138,7 @@ async function register(email, password, nombre, apellidos) {
       email_verificado
     )
     VALUES ($1, $2, $3, $4, 'APP', 'ACTIVO', $5)
-    RETURNING id_usuario, email, nombre, apellidos, tipo, estado, id_empresa, email_verificado
+    RETURNING id_usuario, email, nombre, apellidos, tipo, estado, id_empresa, email_verificado, avatar_url
     `,
     [normEmail, passwordHash, nombre || null, apellidos || null, !REQUIRE_EMAIL_VERIFICATION]
   );
@@ -161,7 +163,8 @@ async function register(email, password, nombre, apellidos) {
         tipo: user.tipo,
         estado: user.estado,
         id_empresa: user.id_empresa,
-        email_verificado: false
+        email_verificado: false,
+        avatar_url: user.avatar_url
       },
       mensaje: 'Usuario registrado. Revisa tu email para verificar tu cuenta.'
     };
@@ -179,7 +182,8 @@ async function register(email, password, nombre, apellidos) {
       tipo: user.tipo,
       estado: user.estado,
       id_empresa: user.id_empresa,
-      email_verificado: true
+      email_verificado: true,
+      avatar_url: user.avatar_url
     }, 
     token 
   };
@@ -268,7 +272,7 @@ async function resetPassword(token, newPassword) {
     `UPDATE usuario 
      SET password_hash = $1, updated_at = NOW()
      WHERE id_usuario = $2 AND email = $3
-     RETURNING id_usuario, email, nombre, apellidos, tipo, estado`,
+     RETURNING id_usuario, email, nombre, apellidos, tipo, estado, avatar_url`,
     [passwordHash, decoded.id_usuario, decoded.email]
   );
 
@@ -346,7 +350,7 @@ async function googleLogin(idToken) {
                ultimo_login_at = NOW(),
                updated_at = NOW()
            WHERE id_usuario = $2
-           RETURNING id_usuario, email, nombre, apellidos, tipo, estado, id_empresa, google_id`,
+           RETURNING id_usuario, email, nombre, apellidos, tipo, estado, id_empresa, google_id, avatar_url`,
           [googleId, user.id_usuario]
         );
         user = rows[0];
@@ -372,7 +376,7 @@ async function googleLogin(idToken) {
           password_hash
         )
         VALUES ($1, $2, $3, $4, 'APP', 'ACTIVO', true, NULL)
-        RETURNING id_usuario, email, nombre, apellidos, tipo, estado, id_empresa, google_id`,
+        RETURNING id_usuario, email, nombre, apellidos, tipo, estado, id_empresa, google_id, avatar_url`,
         [normEmail, googleId, nombre, apellidos]
       );
       user = rows[0];
@@ -391,7 +395,8 @@ async function googleLogin(idToken) {
         tipo: user.tipo,
         estado: user.estado,
         id_empresa: user.id_empresa,
-        email_verificado: true
+        email_verificado: true,
+        avatar_url: user.avatar_url
       },
       token,
       mensaje: 'Login con Google exitoso'
@@ -446,7 +451,7 @@ async function appleLogin(identityToken, appleUser) {
                ultimo_login_at = NOW(),
                updated_at = NOW()
            WHERE id_usuario = $2
-           RETURNING id_usuario, email, nombre, apellidos, tipo, estado, id_empresa, apple_id`,
+           RETURNING id_usuario, email, nombre, apellidos, tipo, estado, id_empresa, apple_id, avatar_url`,
           [appleId, user.id_usuario]
         );
         user = rows[0];
@@ -476,7 +481,7 @@ async function appleLogin(identityToken, appleUser) {
           password_hash
         )
         VALUES ($1, $2, $3, $4, 'APP', 'ACTIVO', true, NULL)
-        RETURNING id_usuario, email, nombre, apellidos, tipo, estado, id_empresa, apple_id`,
+        RETURNING id_usuario, email, nombre, apellidos, tipo, estado, id_empresa, apple_id, avatar_url`,
         [normEmail, appleId, nombre, apellidos]
       );
       user = rows[0];
@@ -495,7 +500,8 @@ async function appleLogin(identityToken, appleUser) {
         tipo: user.tipo,
         estado: user.estado,
         id_empresa: user.id_empresa,
-        email_verificado: true
+        email_verificado: true,
+        avatar_url: user.avatar_url
       },
       token,
       mensaje: 'Login con Apple exitoso'
