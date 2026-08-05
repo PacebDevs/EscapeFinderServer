@@ -123,6 +123,13 @@ console.log('→ cacheKey:', cacheKey);
       s.*, 
       v.min_pp AS precio_min_pp,
       v.max_pp AS precio_max_pp,
+      v.min_total AS precio_min_total,
+      v.max_total AS precio_max_total,
+      CASE
+        WHEN v.min_pp IS NOT NULL OR v.max_pp IS NOT NULL THEN 'por_persona'
+        WHEN v.min_total IS NOT NULL OR v.max_total IS NOT NULL THEN 'total'
+        ELSE NULL
+      END AS tipo_precio,
       ${distanciaSelect} -- Aquí se inserta el cálculo o NULL
       l.nombre AS nombre_local, 
       d.*, 
@@ -203,7 +210,7 @@ console.log('→ cacheKey:', cacheKey);
   // ✅ Si no se filtra por distancia, permitir filtro por ciudad
   if (!filtrarPorDistancia && normalizedFilters.ciudad) {
     // Usamos la función f_unaccent en la consulta
-    query += ` AND LOWER(public.f_unaccent(d.ciudad)) = $${idx}`;
+    query += ` AND LOWER(public.f_unaccent(d.ciudad)) = LOWER(public.f_unaccent($${idx}))`;
     values.push(normalizedFilters.ciudad);
     idx++;
   }
@@ -340,7 +347,8 @@ if (filtrarPorDistancia) {
 
 
   query += `
-    GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva, v.min_pp, v.max_pp
+    GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva,
+             v.min_pp, v.max_pp, v.min_total, v.max_total
     ORDER BY s.${campoOrden} ASC
     LIMIT $${idx++} OFFSET $${idx++}
   `;
@@ -382,6 +390,13 @@ exports.getSalaById = async (id_sala, lat = null, lng = null) => {
       ${distanciaSelect}
       v.min_pp AS precio_min_pp,
       v.max_pp AS precio_max_pp,
+      v.min_total AS precio_min_total,
+      v.max_total AS precio_max_total,
+      CASE
+        WHEN v.min_pp IS NOT NULL OR v.max_pp IS NOT NULL THEN 'por_persona'
+        WHEN v.min_total IS NOT NULL OR v.max_total IS NOT NULL THEN 'total'
+        ELSE NULL
+      END AS tipo_precio,
       l.nombre AS nombre_local, 
       d.*, 
       e.nombre AS empresa,
@@ -424,7 +439,8 @@ exports.getSalaById = async (id_sala, lat = null, lng = null) => {
 
     WHERE s.id_sala = $1
     GROUP BY 
-      s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva, v.min_pp, v.max_pp
+      s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva,
+      v.min_pp, v.max_pp, v.min_total, v.max_total
   `;
 
   const { rows } = await db.query(query, values);

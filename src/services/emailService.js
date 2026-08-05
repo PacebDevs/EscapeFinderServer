@@ -12,6 +12,74 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function buildBrandedEmail({
+  chip,
+  title,
+  intro,
+  ctaLabel,
+  ctaUrl,
+  fallbackText,
+  note,
+  highlight
+}) {
+  const safeTitle = escapeHtml(title);
+  const safeIntro = escapeHtml(intro);
+  const safeCtaLabel = escapeHtml(ctaLabel);
+  const safeCtaUrl = escapeHtml(ctaUrl);
+  const safeFallbackText = escapeHtml(fallbackText);
+  const safeNote = escapeHtml(note);
+  const safeChip = escapeHtml(chip);
+  const safeHighlight = escapeHtml(highlight);
+
+  return `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>${safeTitle}</title>
+    </head>
+    <body style="margin: 0; padding: 24px 12px; background-color: #f3f5ff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 620px; margin: 0 auto; border-collapse: collapse;">
+        <tr>
+          <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px 20px 0 0; padding: 26px 28px; color: #ffffff;">
+            <p style="margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.9;">${safeChip}</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 28px; line-height: 1.2;">EscapeFinder</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="background: #ffffff; border-radius: 0 0 20px 20px; padding: 30px 28px; box-shadow: 0 8px 26px rgba(57, 66, 129, 0.15);">
+            <h2 style="margin: 0 0 12px 0; color: #2b2f4a; font-size: 24px; line-height: 1.3;">${safeTitle}</h2>
+            <p style="margin: 0 0 8px 0; color: #515877; font-size: 16px; line-height: 1.6;">${safeIntro}</p>
+            <p style="margin: 0 0 24px 0; color: #515877; font-size: 16px; line-height: 1.6;"><strong>${safeHighlight}</strong></p>
+
+            <a href="${safeCtaUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 24px; border-radius: 12px; font-size: 16px; font-weight: 700;">
+              ${safeCtaLabel}
+            </a>
+
+            <p style="margin: 26px 0 8px 0; color: #6f7390; font-size: 14px; line-height: 1.6;">Si el boton no funciona, copia y pega este enlace en tu navegador:</p>
+            <p style="margin: 0; word-break: break-all; color: #667eea; font-size: 14px;">${safeCtaUrl}</p>
+
+            <hr style="border: 0; border-top: 1px solid #e7e9f5; margin: 28px 0 18px 0;" />
+            <p style="margin: 0; color: #7f859f; font-size: 13px; line-height: 1.6;">${safeFallbackText}</p>
+            <p style="margin: 10px 0 0 0; color: #7f859f; font-size: 13px; line-height: 1.6;">${safeNote}</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
 async function enviarEmailVerificacion(usuario) {
   const token = jwt.sign(
     { 
@@ -24,27 +92,23 @@ async function enviarEmailVerificacion(usuario) {
   );
 
   const urlVerificacion = `${process.env.BASE_URL || 'http://localhost:3000'}/verify-email?token=${token}`;
+  const nombreUsuario = usuario.nombre || 'explorador';
 
   const mailOptions = {
     from: `"EscapeFinder" <${process.env.EMAIL_USER}>`,
     to: usuario.email,
-    subject: 'Verifica tu cuenta - EscapeFinder',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>¡Bienvenido a EscapeFinder, ${usuario.nombre || 'Usuario'}!</h2>
-        <p>Para completar tu registro, verifica tu correo electrónico haciendo clic en el botón:</p>
-        <a href="${urlVerificacion}" 
-           style="display: inline-block; padding: 12px 24px; background-color: #5d4037; 
-                  color: white; text-decoration: none; border-radius: 8px; margin: 20px 0;">
-          Verificar Email
-        </a>
-        <p>O copia este enlace en tu navegador:</p>
-        <p style="color: #666; word-break: break-all;">${urlVerificacion}</p>
-        <p style="color: #999; font-size: 12px; margin-top: 30px;">
-          Este enlace expira en 24 horas. Si no solicitaste este registro, ignora este correo.
-        </p>
-      </div>
-    `
+    subject: 'Confirma tu cuenta y empieza a explorar | EscapeFinder',
+    text: `Hola ${nombreUsuario},\n\nTu aventura en EscapeFinder empieza aqui.\nConfirma tu cuenta desde este enlace: ${urlVerificacion}\n\nEste enlace expira en 24 horas. Si no creaste esta cuenta, puedes ignorar este mensaje.`,
+    html: buildBrandedEmail({
+      chip: 'Nuevo registro',
+      title: `Bienvenido, ${nombreUsuario}`,
+      intro: 'Tu aventura en EscapeFinder esta a un solo paso de comenzar.',
+      highlight: 'Confirma tu email para activar tu cuenta y descubrir nuevas salas.',
+      ctaLabel: 'Verificar email',
+      ctaUrl: urlVerificacion,
+      fallbackText: 'Este enlace expira en 24 horas.',
+      note: 'Si no creaste esta cuenta, puedes ignorar este mensaje con tranquilidad.'
+    })
   };
 
   try {
@@ -62,32 +126,23 @@ async function enviarEmailVerificacion(usuario) {
  */
 async function enviarEmailRecuperacion(usuario, token) {
   const urlRecuperacion = `${process.env.BASE_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+  const nombreUsuario = usuario.nombre || 'explorador';
 
   const mailOptions = {
     from: `"EscapeFinder" <${process.env.EMAIL_USER}>`,
     to: usuario.email,
-    subject: 'Recuperar contraseña - EscapeFinder',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Recuperación de contraseña</h2>
-        <p>Hola ${usuario.nombre || 'Usuario'},</p>
-        <p>Recibimos una solicitud para restablecer tu contraseña en EscapeFinder.</p>
-        <p>Haz clic en el botón para crear una nueva contraseña:</p>
-        <a href="${urlRecuperacion}" 
-           style="display: inline-block; padding: 12px 24px; background-color: #5d4037; 
-                  color: white; text-decoration: none; border-radius: 8px; margin: 20px 0;">
-          Restablecer Contraseña
-        </a>
-        <p>O copia este enlace en tu navegador:</p>
-        <p style="color: #666; word-break: break-all;">${urlRecuperacion}</p>
-        <p style="color: #999; font-size: 12px; margin-top: 30px;">
-          Este enlace expira en 1 hora. Si no solicitaste restablecer tu contraseña, ignora este correo.
-        </p>
-        <p style="color: #999; font-size: 12px;">
-          Por seguridad, nunca compartas este enlace con nadie.
-        </p>
-      </div>
-    `
+    subject: 'Restablece tu acceso de forma segura | EscapeFinder',
+    text: `Hola ${nombreUsuario},\n\nRecibimos una solicitud para restablecer tu contrasena en EscapeFinder.\nHazlo desde este enlace: ${urlRecuperacion}\n\nEste enlace expira en 1 hora. Si no solicitaste el cambio, ignora este correo y manten tu cuenta protegida.`,
+    html: buildBrandedEmail({
+      chip: 'Seguridad de cuenta',
+      title: `Hola ${nombreUsuario}, vamos a recuperar tu acceso`,
+      intro: 'Recibimos una solicitud para restablecer tu contrasena en EscapeFinder.',
+      highlight: 'Crea una nueva contrasena para volver a entrar y seguir explorando.',
+      ctaLabel: 'Restablecer contrasena',
+      ctaUrl: urlRecuperacion,
+      fallbackText: 'Este enlace expira en 1 hora.',
+      note: 'Si no solicitaste este cambio, ignora este correo. Nunca compartas este enlace.'
+    })
   };
 
   try {

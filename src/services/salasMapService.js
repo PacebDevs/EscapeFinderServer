@@ -41,6 +41,14 @@ exports.getSalasForMap = async (normalizedFilters) => {
       s.dificultad,
       ${distanciaSelect}
       v.min_pp AS precio_min_pp,
+      v.max_pp AS precio_max_pp,
+      v.min_total AS precio_min_total,
+      v.max_total AS precio_max_total,
+      CASE
+        WHEN v.min_pp IS NOT NULL OR v.max_pp IS NOT NULL THEN 'por_persona'
+        WHEN v.min_total IS NOT NULL OR v.max_total IS NOT NULL THEN 'total'
+        ELSE NULL
+      END AS tipo_precio,
       d.latitud,
       d.longitud,
       d.ciudad,
@@ -106,7 +114,7 @@ exports.getSalasForMap = async (normalizedFilters) => {
   }
 
   if (!filtrarPorDistancia && normalizedFilters.ciudad) {
-    query += ` AND LOWER(public.f_unaccent(d.ciudad)) = $${idx}`;
+    query += ` AND LOWER(public.f_unaccent(d.ciudad)) = LOWER(public.f_unaccent($${idx}))`;
     values.push(normalizedFilters.ciudad);
     idx++;
   }
@@ -231,7 +239,8 @@ exports.getSalasForMap = async (normalizedFilters) => {
 
   // Agrupación mínima para evitar duplicados por los LEFT JOIN de filtros
   query += `
-    GROUP BY s.id_sala, d.id_direccion, d.tipo_via, d.nombre_via, d.numero, d.ampliacion, d.codigo_postal, v.min_pp, e.nombre, c.nombre
+    GROUP BY s.id_sala, d.id_direccion, d.tipo_via, d.nombre_via, d.numero, d.ampliacion,
+             d.codigo_postal, v.min_pp, v.max_pp, v.min_total, v.max_total, e.nombre, c.nombre
     ORDER BY s.nombre ASC
   `;
 

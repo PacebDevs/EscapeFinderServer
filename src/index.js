@@ -99,106 +99,286 @@ app.get('/verify-email', async (req, res) => {
 });
 
 function generateSuccessPage(title, message, subtitle, showAppButton = true) {
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>${title} - EscapeFinder</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          min-height: 100vh;
-          margin: 0;
-          padding: 20px;
-        }
-        .container {
-          background: white;
-          padding: 40px;
-          border-radius: 20px;
-          max-width: 500px;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-          text-align: center;
-        }
-        .icon { font-size: 80px; margin-bottom: 20px; }
-        h1 { color: #333; margin: 10px 0; font-size: 24px; }
-        p { color: #666; line-height: 1.6; margin: 15px 0; }
-        button {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          border: none;
-          padding: 14px 28px;
-          border-radius: 12px;
-          cursor: pointer;
-          width: 100%;
-          margin-top: 20px;
-          font-size: 16px;
-          font-weight: 600;
-        }
-        button:hover { opacity: 0.9; }
-        button:active { transform: scale(0.98); }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="icon">✅</div>
-        <h1>${title}</h1>
-        <p>${message}</p>
-        <p><strong>${subtitle}</strong></p>
-        ${showAppButton ? `
-          <a href="escapefinder://login" style="display: block; text-decoration: none;">
-            <button style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 14px 28px; border-radius: 12px; cursor: pointer; width: 100%; margin-top: 20px; font-size: 16px; font-weight: 600;">
-              Abrir EscapeFinder
-            </button>
-          </a>
-        ` : ''}
-      </div>
-    </body>
-    </html>
-  `;
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
+  const safeSubtitle = escapeHtml(subtitle);
+
+  return renderBrandedPage({
+    pageTitle: `${safeTitle} - EscapeFinder`,
+    chip: 'Cuenta verificada',
+    icon: '✅',
+    iconClass: 'success',
+    title: safeTitle,
+    bodyHtml: `
+      <p class="lead">${safeMessage}</p>
+      <p class="support"><strong>${safeSubtitle}</strong></p>
+    `,
+    actionsHtml: showAppButton
+      ? '<a class="btn-primary" href="escapefinder://login">Abrir EscapeFinder</a>'
+      : ''
+  });
 }
 
 function generateErrorPage(errorMessage) {
+  const safeErrorMessage = escapeHtml(errorMessage);
+
+  return renderBrandedPage({
+    pageTitle: 'Error - EscapeFinder',
+    chip: 'Accion requerida',
+    icon: '❌',
+    iconClass: 'danger',
+    title: 'No se pudo completar la solicitud',
+    bodyHtml: `<p class="lead">${safeErrorMessage}</p>`,
+    actionsHtml: '<a class="btn-secondary" href="escapefinder://login">Volver a EscapeFinder</a>'
+  });
+}
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function getBrandedStyles(extraStyles = '') {
+  return `
+    :root {
+      --brand-primary: #667eea;
+      --brand-secondary: #764ba2;
+      --bg-soft: #eef1ff;
+      --text-strong: #232846;
+      --text-muted: #5b6180;
+      --line-soft: #e8ebf7;
+      --danger: #d43c5a;
+      --success: #1f9d68;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 16px;
+      position: relative;
+      overflow-x: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background:
+        radial-gradient(circle at 12% 12%, rgba(255,255,255,0.32), transparent 45%),
+        radial-gradient(circle at 90% 85%, rgba(255,255,255,0.2), transparent 34%),
+        linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+      color: var(--text-strong);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bg-orb {
+      position: fixed;
+      border-radius: 999px;
+      filter: blur(3px);
+      z-index: 0;
+      opacity: 0.42;
+      pointer-events: none;
+    }
+
+    .bg-orb.orb-a {
+      width: 220px;
+      height: 220px;
+      top: -40px;
+      right: -60px;
+      background: linear-gradient(160deg, #84f3db 0%, #5ec4ff 100%);
+    }
+
+    .bg-orb.orb-b {
+      width: 190px;
+      height: 190px;
+      bottom: -45px;
+      left: -45px;
+      background: linear-gradient(135deg, #f8d372 0%, #f49f80 100%);
+    }
+
+    .app-shell {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 620px;
+      border-radius: 26px;
+      overflow: hidden;
+      background: #ffffff;
+      box-shadow: 0 24px 52px rgba(23, 30, 72, 0.26);
+    }
+
+    .app-header {
+      padding: 24px 30px;
+      background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+      color: #ffffff;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.2);
+      margin-bottom: 12px;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: 0.01em;
+    }
+
+    .app-content {
+      padding: 30px;
+    }
+
+    .status-icon {
+      width: 74px;
+      height: 74px;
+      margin: 0 auto 14px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+      font-weight: 700;
+    }
+
+    .status-icon.success {
+      background: rgba(31, 157, 104, 0.12);
+      color: var(--success);
+    }
+
+    .status-icon.danger {
+      background: rgba(212, 60, 90, 0.14);
+      color: var(--danger);
+    }
+
+    h1 {
+      margin: 0 0 12px 0;
+      text-align: center;
+      color: var(--text-strong);
+      font-size: 30px;
+      line-height: 1.2;
+    }
+
+    .lead {
+      margin: 0 0 12px 0;
+      text-align: center;
+      color: var(--text-muted);
+      line-height: 1.7;
+      font-size: 16px;
+    }
+
+    .support {
+      margin: 0;
+      text-align: center;
+      color: #3a3f5d;
+      line-height: 1.7;
+      font-size: 16px;
+    }
+
+    .actions {
+      margin-top: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 48px;
+      width: 100%;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 700;
+      transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .btn-primary {
+      color: #ffffff;
+      background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+      box-shadow: 0 10px 22px rgba(102, 126, 234, 0.35);
+    }
+
+    .btn-secondary {
+      color: #444f80;
+      background: var(--bg-soft);
+      border: 1px solid #d5dbf0;
+    }
+
+    .btn-primary:hover,
+    .btn-secondary:hover {
+      transform: translateY(-1px);
+      opacity: 0.95;
+    }
+
+    .btn-primary:active,
+    .btn-secondary:active {
+      transform: translateY(0);
+    }
+
+    @media (max-width: 600px) {
+      body { padding: 10px; }
+      .app-shell { border-radius: 22px; }
+      .app-header { padding: 20px 20px; }
+      .brand-title { font-size: 26px; }
+      .app-content { padding: 22px 18px; }
+      h1 { font-size: 25px; }
+    }
+
+    ${extraStyles}
+  `;
+}
+
+function renderBrandedPage({
+  pageTitle,
+  chip,
+  icon,
+  iconClass,
+  title,
+  bodyHtml,
+  actionsHtml = '',
+  extraStyles = '',
+  script = ''
+}) {
   return `
     <!DOCTYPE html>
-    <html>
+    <html lang="es">
     <head>
-      <title>Error - EscapeFinder</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          min-height: 100vh;
-          margin: 0;
-          padding: 20px;
-        }
-        .container {
-          background: white;
-          padding: 40px;
-          border-radius: 20px;
-          max-width: 500px;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-          text-align: center;
-        }
-        .icon { font-size: 80px; margin-bottom: 20px; color: #f04141; }
-        h1 { color: #333; margin: 10px 0; font-size: 24px; }
-        p { color: #666; line-height: 1.6; margin: 15px 0; }
-      </style>
+      <meta charset="utf-8" />
+      <title>${pageTitle}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <style>${getBrandedStyles(extraStyles)}</style>
     </head>
     <body>
-      <div class="container">
-        <div class="icon">❌</div>
-        <h1>Error</h1>
-        <p>${errorMessage}</p>
-      </div>
+      <div class="bg-orb orb-a"></div>
+      <div class="bg-orb orb-b"></div>
+
+      <main class="app-shell">
+        <header class="app-header">
+          <div class="chip">${chip}</div>
+          <h2 class="brand-title">EscapeFinder</h2>
+        </header>
+
+        <section class="app-content">
+          <div class="status-icon ${iconClass}">${icon}</div>
+          <h1>${title}</h1>
+          ${bodyHtml}
+          ${actionsHtml ? `<div class="actions">${actionsHtml}</div>` : ''}
+        </section>
+      </main>
+      ${script}
     </body>
     </html>
   `;
@@ -212,239 +392,288 @@ app.get('/reset-password', (req, res) => {
     return res.send(generateErrorPage('Token no proporcionado'));
   }
 
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Restablecer Contraseña - EscapeFinder</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          min-height: 100vh;
-          margin: 0;
-          padding: 20px;
-        }
-        .container {
-          background: white;
-          padding: 40px;
-          border-radius: 20px;
-          max-width: 500px;
-          width: 100%;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-        }
-        h1 { color: #333; margin: 0 0 10px 0; font-size: 24px; text-align: center; }
-        p { color: #666; line-height: 1.6; margin: 0 0 30px 0; text-align: center; }
-        .form-group {
-          margin-bottom: 20px;
-          position: relative;
-        }
-        label {
-          display: block;
-          margin-bottom: 8px;
-          color: #333;
-          font-weight: 500;
-        }
-        .input-wrapper {
-          position: relative;
-        }
-        input {
-          width: 100%;
-          padding: 12px 45px 12px 12px;
-          border: 2px solid #e0e0e0;
-          border-radius: 8px;
-          font-size: 16px;
-          box-sizing: border-box;
-          transition: border-color 0.3s;
-        }
-        input:focus {
-          outline: none;
-          border-color: #667eea;
-        }
-        .toggle-password {
-          position: absolute;
-          right: 12px;
-          top: 50%;
-          transform: translateY(-50%);
-          background: none;
-          border: none;
-          cursor: pointer;
-          font-size: 20px;
-          padding: 5px;
-          color: #666;
-          width: auto;
-        }
-        .toggle-password:hover {
-          color: #667eea;
-          opacity: 1;
-          transform: translateY(-50%);
-        }
-        button {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          border: none;
-          padding: 14px;
-          border-radius: 12px;
-          cursor: pointer;
-          width: 100%;
-          font-size: 16px;
-          font-weight: 600;
-        }
-        button:hover { opacity: 0.9; }
-        button:active { transform: scale(0.98); }
-        button:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-        .error {
-          color: #f04141;
-          font-size: 14px;
-          margin-top: 5px;
-          display: none;
-        }
-        .error.show { display: block; }
-        .spinner {
-          display: inline-block;
-          width: 16px;
-          height: 16px;
-          border: 2px solid #fff;
-          border-top: 2px solid transparent;
-          border-radius: 50%;
-          animation: spin 0.6s linear infinite;
-        }
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h1>🔐 Restablecer Contraseña</h1>
-        <p>Ingresa tu nueva contraseña</p>
-        
-        <form id="resetForm">
-          <div class="form-group">
-            <label for="password">Nueva Contraseña</label>
-            <div class="input-wrapper">
-              <input type="password" id="password" name="password" 
-                     placeholder="Mínimo 8 caracteres" required minlength="8">
-              <button type="button" class="toggle-password" onclick="togglePasswordVisibility('password', this)">
-                👁️
-              </button>
-            </div>
-            <div class="error" id="passwordError">La contraseña debe tener al menos 8 caracteres</div>
-          </div>
-          
-          <div class="form-group">
-            <label for="confirmPassword">Confirmar Contraseña</label>
-            <div class="input-wrapper">
-              <input type="password" id="confirmPassword" name="confirmPassword" 
-                     placeholder="Repite la contraseña" required>
-              <button type="button" class="toggle-password" onclick="togglePasswordVisibility('confirmPassword', this)">
-                👁️
-              </button>
-            </div>
-            <div class="error" id="confirmError">Las contraseñas no coinciden</div>
-          </div>
-          
-          <button type="submit" id="submitBtn">
-            <span id="btnText">Restablecer Contraseña</span>
-            <span id="btnSpinner" class="spinner" style="display:none;"></span>
-          </button>
-        </form>
+  const extraStyles = `
+    .status-icon.neutral {
+      background: rgba(102, 126, 234, 0.14);
+      color: #4f5fc5;
+    }
+
+    form {
+      margin-top: 24px;
+    }
+
+    .form-row {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #2f3556;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    input {
+      width: 100%;
+      height: 48px;
+      border: 1px solid #d5dbf0;
+      border-radius: 12px;
+      padding: 0 46px 0 14px;
+      font-size: 15px;
+      color: #232846;
+      background: #fbfcff;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    input::placeholder {
+      color: #8b90a9;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--brand-primary);
+      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.12);
+      background: #ffffff;
+    }
+
+    .toggle-password {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      cursor: pointer;
+      color: #6f7698;
+      font-size: 18px;
+    }
+
+    .toggle-password:hover {
+      background: #edf0fb;
+      color: #4958be;
+    }
+
+    .error {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--danger);
+      display: none;
+    }
+
+    .error.show {
+      display: block;
+    }
+
+    .form-feedback {
+      margin: 12px 0 0 0;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(212, 60, 90, 0.3);
+      background: rgba(212, 60, 90, 0.08);
+      color: #a7304a;
+      font-size: 14px;
+      line-height: 1.5;
+      display: none;
+    }
+
+    .form-feedback.show {
+      display: block;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top: 2px solid #ffffff;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `;
+
+  const bodyHtml = `
+    <p class="lead">Ingresa tu nueva contrasena para recuperar el acceso de forma segura.</p>
+    <p class="support"><strong>Tu nueva contrasena debe tener al menos 8 caracteres.</strong></p>
+
+    <form id="resetForm" novalidate>
+      <div class="form-row">
+        <label for="password">Nueva contrasena</label>
+        <div class="input-wrapper">
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Minimo 8 caracteres"
+            required
+            minlength="8"
+            autocomplete="new-password"
+          />
+          <button type="button" class="toggle-password" data-target="password" aria-label="Mostrar u ocultar contrasena">👁️</button>
+        </div>
+        <div class="error" id="passwordError">La contrasena debe tener al menos 8 caracteres.</div>
       </div>
 
-      <script>
-        const token = '${token}';
-        const form = document.getElementById('resetForm');
-        const submitBtn = document.getElementById('submitBtn');
-        const btnText = document.getElementById('btnText');
-        const btnSpinner = document.getElementById('btnSpinner');
-        
-        function togglePasswordVisibility(inputId, button) {
+      <div class="form-row">
+        <label for="confirmPassword">Confirmar contrasena</label>
+        <div class="input-wrapper">
+          <input
+            type="password"
+            id="confirmPassword"
+            name="confirmPassword"
+            placeholder="Repite la contrasena"
+            required
+            autocomplete="new-password"
+          />
+          <button type="button" class="toggle-password" data-target="confirmPassword" aria-label="Mostrar u ocultar contrasena">👁️</button>
+        </div>
+        <div class="error" id="confirmError">Las contrasenas no coinciden.</div>
+      </div>
+
+      <button type="submit" class="btn-primary" id="submitBtn" style="border: none; cursor: pointer;">
+        <span id="btnText">Actualizar contrasena</span>
+        <span id="btnSpinner" class="spinner" style="display:none;"></span>
+      </button>
+      <div class="form-feedback" id="formFeedback"></div>
+    </form>
+  `;
+
+  const script = `
+    <script>
+      const token = ${JSON.stringify(token)};
+      const form = document.getElementById('resetForm');
+      const submitBtn = document.getElementById('submitBtn');
+      const btnText = document.getElementById('btnText');
+      const btnSpinner = document.getElementById('btnSpinner');
+      const passwordError = document.getElementById('passwordError');
+      const confirmError = document.getElementById('confirmError');
+      const formFeedback = document.getElementById('formFeedback');
+
+      function setLoading(isLoading) {
+        submitBtn.disabled = isLoading;
+        btnText.style.display = isLoading ? 'none' : 'inline';
+        btnSpinner.style.display = isLoading ? 'inline-block' : 'none';
+      }
+
+      function showFormFeedback(message) {
+        formFeedback.textContent = message;
+        formFeedback.classList.add('show');
+      }
+
+      function hideFormFeedback() {
+        formFeedback.classList.remove('show');
+        formFeedback.textContent = '';
+      }
+
+      function resetErrors() {
+        passwordError.classList.remove('show');
+        confirmError.classList.remove('show');
+        hideFormFeedback();
+      }
+
+      function renderPasswordUpdatedState() {
+        document.body.innerHTML = [
+          '<div class="bg-orb orb-a"></div>',
+          '<div class="bg-orb orb-b"></div>',
+          '<main class="app-shell">',
+          '  <header class="app-header">',
+          '    <div class="chip">Seguridad de cuenta</div>',
+          '    <h2 class="brand-title">EscapeFinder</h2>',
+          '  </header>',
+          '  <section class="app-content">',
+          '    <div class="status-icon success">✅</div>',
+          '    <h1>Contrasena actualizada</h1>',
+          '    <p class="lead">Tu contrasena se restablecio correctamente.</p>',
+          '    <p class="support"><strong>Ya puedes volver a iniciar sesion en la app.</strong></p>',
+          '    <div class="actions">',
+          '      <a class="btn-primary" href="escapefinder://login">Abrir EscapeFinder</a>',
+          '    </div>',
+          '  </section>',
+          '</main>'
+        ].join('');
+      }
+
+      document.querySelectorAll('.toggle-password').forEach((button) => {
+        button.addEventListener('click', () => {
+          const inputId = button.getAttribute('data-target');
           const input = document.getElementById(inputId);
+
           if (input.type === 'password') {
             input.type = 'text';
             button.textContent = '🙈';
-          } else {
-            input.type = 'password';
-            button.textContent = '👁️';
-          }
-        }
-        
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          
-          const password = document.getElementById('password').value;
-          const confirmPassword = document.getElementById('confirmPassword').value;
-          const passwordError = document.getElementById('passwordError');
-          const confirmError = document.getElementById('confirmError');
-          
-          // Reset errors
-          passwordError.classList.remove('show');
-          confirmError.classList.remove('show');
-          
-          // Validations
-          if (password.length < 8) {
-            passwordError.classList.add('show');
             return;
           }
-          
-          if (password !== confirmPassword) {
-            confirmError.classList.add('show');
-            return;
-          }
-          
-          // Disable button and show spinner
-          submitBtn.disabled = true;
-          btnText.style.display = 'none';
-          btnSpinner.style.display = 'inline-block';
-          
-          try {
-            const response = await fetch('/api/auth/reset-password', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ token, newPassword: password })
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-              // Success - show success page
-              document.body.innerHTML = \`
-                <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                  <div style="background: white; padding: 40px; border-radius: 20px; max-width: 500px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); text-align: center;">
-                    <div style="font-size: 80px; margin-bottom: 20px;">✅</div>
-                    <h1 style="color: #333; margin: 10px 0; font-size: 24px;">Contraseña Actualizada</h1>
-                    <p style="color: #666; line-height: 1.6; margin: 15px 0;">Tu contraseña ha sido restablecida correctamente.</p>
-                    <p style="color: #666; line-height: 1.6; margin: 15px 0;"><strong>Ahora puedes iniciar sesión con tu nueva contraseña.</strong></p>
-                    <a href="escapefinder://login" style="display: block; text-decoration: none;">
-                      <button style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 14px 28px; border-radius: 12px; cursor: pointer; width: 100%; margin-top: 20px; font-size: 16px; font-weight: 600;">Abrir EscapeFinder</button>
-                    </a>
-                  </div>
-                </div>
-              \`;
-            } else {
-              throw new Error(data.error || 'Error al restablecer contraseña');
-            }
-          } catch (error) {
-            alert('Error: ' + error.message);
-            submitBtn.disabled = false;
-            btnText.style.display = 'inline';
-            btnSpinner.style.display = 'none';
-          }
+
+          input.type = 'password';
+          button.textContent = '👁️';
         });
-      </script>
-    </body>
-    </html>
-  `);
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        resetErrors();
+
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        if (password.length < 8) {
+          passwordError.classList.add('show');
+          return;
+        }
+
+        if (password !== confirmPassword) {
+          confirmError.classList.add('show');
+          return;
+        }
+
+        setLoading(true);
+
+        try {
+          const response = await fetch('/api/auth/reset-password', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ token, newPassword: password })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || 'No se pudo restablecer la contrasena.');
+          }
+
+          renderPasswordUpdatedState();
+        } catch (error) {
+          setLoading(false);
+          showFormFeedback(error.message || 'Error inesperado. Intentalo de nuevo.');
+        }
+      });
+    </script>
+  `;
+
+  res.send(renderBrandedPage({
+    pageTitle: 'Restablecer Contrasena - EscapeFinder',
+    chip: 'Seguridad de cuenta',
+    icon: '🔐',
+    iconClass: 'neutral',
+    title: 'Restablecer contrasena',
+    bodyHtml,
+    extraStyles,
+    script
+  }));
 });
 
 // Socket.io con la misma configuración de CORS
