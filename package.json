@@ -4,6 +4,8 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon",
+    "test": "node --test src/**/*.test.js",
+    "migrate:prices": "node src/scripts/migratePriceSemantics.js",
     "update-images": "node src/scripts/updateImages.js",
     "updateAndRefactorImages": "node src/scripts/updateAndRefactorImages.js",
     "start": "node index.js",

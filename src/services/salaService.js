@@ -2,6 +2,7 @@ const db = require('../config/db');
 const redis = require('../cache/redisClient');
 const { io } = require('../socket');
 const mapService = require('./mapService');
+const { buildPriceFilter } = require('./priceFilter');
 
 exports.getFilteredSalas = async (filters) => {
 
@@ -121,15 +122,16 @@ console.log('→ cacheKey:', cacheKey);
   let query = `
     SELECT 
       s.*, 
-      v.min_pp AS precio_min_pp,
-      v.max_pp AS precio_max_pp,
-      v.min_total AS precio_min_total,
-      v.max_total AS precio_max_total,
-      CASE
-        WHEN v.min_pp IS NOT NULL OR v.max_pp IS NOT NULL THEN 'por_persona'
-        WHEN v.min_total IS NOT NULL OR v.max_total IS NOT NULL THEN 'total'
-        ELSE NULL
-      END AS tipo_precio,
+      v.publicado_min_pp AS precio_min_pp,
+      v.publicado_max_pp AS precio_max_pp,
+      v.publicado_min_total AS precio_min_total,
+      v.publicado_max_total AS precio_max_total,
+      v.tipo_precio_publicado AS tipo_precio,
+      v.publicado_source AS precio_publicado_source,
+      v.detalle_min_pp AS precio_detalle_min_pp,
+      v.detalle_max_pp AS precio_detalle_max_pp,
+      v.detalle_min_total AS precio_detalle_min_total,
+      v.detalle_max_total AS precio_detalle_max_total,
       ${distanciaSelect} -- Aquí se inserta el cálculo o NULL
       l.nombre AS nombre_local, 
       d.*, 
@@ -148,7 +150,7 @@ console.log('→ cacheKey:', cacheKey);
       ARRAY_AGG(DISTINCT ts.nombre) AS tipo_sala
     FROM sala s
     JOIN local l ON s.id_local = l.id_local
-    LEFT JOIN sala_precio_minmax v ON v.id_sala = s.id_sala
+    LEFT JOIN sala_precio_resumen v ON v.id_sala = s.id_sala
     LEFT JOIN empresa e ON e.id_empresa = l.id_empresa
     LEFT JOIN direccion d ON d.id_local = l.id_local
     LEFT JOIN tipo_reserva tr ON tr.id_tipo_reserva = s.id_tipo_reserva
@@ -225,52 +227,14 @@ console.log('→ cacheKey:', cacheKey);
     query += ` AND s.actores = true`;
   }
 
-  // 💶 Filtro de PRECIO por persona
-  if (normalizedFilters.precio_pp !== null) {
-    if (normalizedFilters.jugadores !== null) {
-      // Con nº de jugadores: usa precio exacto si existe; si no existe, cae a max_pp de la sala
-      const precioIdx = idx++;
-      const playersIdx = idx++;
-      query += `
-        AND (
-          EXISTS (
-            SELECT 1
-            FROM sala_precio sp
-            WHERE sp.id_sala = s.id_sala
-              AND sp.players = $${playersIdx}
-              AND sp.price_per_player <= $${precioIdx}
-          )
-          OR (
-            NOT EXISTS (
-              SELECT 1
-              FROM sala_precio sp2
-              WHERE sp2.id_sala = s.id_sala
-                AND sp2.players = $${playersIdx}
-            )
-            AND EXISTS (
-              SELECT 1
-              FROM sala_precio_minmax v
-              WHERE v.id_sala = s.id_sala
-                AND v.max_pp <= $${precioIdx}
-            )
-          )
-        )
-      `;
-      values.push(normalizedFilters.precio_pp, normalizedFilters.jugadores);
-    } else {
-      // Sin nº de jugadores: que su precio por persona NO supere el umbral -> max_pp <= precio
-      const precioIdx = idx++;
-      query += `
-        AND EXISTS (
-          SELECT 1
-          FROM sala_precio_minmax v2
-          WHERE v2.id_sala = s.id_sala
-            AND v2.max_pp <= $${precioIdx}
-        )
-      `;
-      values.push(normalizedFilters.precio_pp);
-    }
-  }
+  const priceFilter = buildPriceFilter({
+    pricePerPlayer: normalizedFilters.precio_pp,
+    players: normalizedFilters.jugadores,
+    startIndex: idx,
+  });
+  query += priceFilter.sql;
+  values.push(...priceFilter.values);
+  idx = priceFilter.nextIndex;
 
   // Lógica para ACCESIBILIDAD (Opt-in: debe tener es_apta = true)
   if (normalizedFilters.accesibilidad.length > 0) {
@@ -348,7 +312,9 @@ if (filtrarPorDistancia) {
 
   query += `
     GROUP BY s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva,
-             v.min_pp, v.max_pp, v.min_total, v.max_total
+             v.publicado_min_pp, v.publicado_max_pp, v.publicado_min_total,
+             v.publicado_max_total, v.tipo_precio_publicado, v.publicado_source,
+             v.detalle_min_pp, v.detalle_max_pp, v.detalle_min_total, v.detalle_max_total
     ORDER BY s.${campoOrden} ASC
     LIMIT $${idx++} OFFSET $${idx++}
   `;
@@ -388,15 +354,16 @@ exports.getSalaById = async (id_sala, lat = null, lng = null) => {
     SELECT 
       s.*, 
       ${distanciaSelect}
-      v.min_pp AS precio_min_pp,
-      v.max_pp AS precio_max_pp,
-      v.min_total AS precio_min_total,
-      v.max_total AS precio_max_total,
-      CASE
-        WHEN v.min_pp IS NOT NULL OR v.max_pp IS NOT NULL THEN 'por_persona'
-        WHEN v.min_total IS NOT NULL OR v.max_total IS NOT NULL THEN 'total'
-        ELSE NULL
-      END AS tipo_precio,
+      v.publicado_min_pp AS precio_min_pp,
+      v.publicado_max_pp AS precio_max_pp,
+      v.publicado_min_total AS precio_min_total,
+      v.publicado_max_total AS precio_max_total,
+      v.tipo_precio_publicado AS tipo_precio,
+      v.publicado_source AS precio_publicado_source,
+      v.detalle_min_pp AS precio_detalle_min_pp,
+      v.detalle_max_pp AS precio_detalle_max_pp,
+      v.detalle_min_total AS precio_detalle_min_total,
+      v.detalle_max_total AS precio_detalle_max_total,
       l.nombre AS nombre_local, 
       d.*, 
       e.nombre AS empresa,
@@ -435,12 +402,14 @@ exports.getSalaById = async (id_sala, lat = null, lng = null) => {
     LEFT JOIN sala_tipo_sala sts ON sts.id_sala = s.id_sala
     LEFT JOIN tipo_sala ts ON ts.id_tipo_sala = sts.id_tipo_sala
     LEFT JOIN sala_imagen sim ON sim.id_sala = s.id_sala
-    LEFT JOIN sala_precio_minmax v ON v.id_sala = s.id_sala
+    LEFT JOIN sala_precio_resumen v ON v.id_sala = s.id_sala
 
     WHERE s.id_sala = $1
     GROUP BY 
       s.id_sala, l.id_local, d.id_direccion, e.id_empresa, tr.id_tipo_reserva,
-      v.min_pp, v.max_pp, v.min_total, v.max_total
+      v.publicado_min_pp, v.publicado_max_pp, v.publicado_min_total,
+      v.publicado_max_total, v.tipo_precio_publicado, v.publicado_source,
+      v.detalle_min_pp, v.detalle_max_pp, v.detalle_min_total, v.detalle_max_total
   `;
 
   const { rows } = await db.query(query, values);
@@ -456,6 +425,7 @@ exports.getSalaById = async (id_sala, lat = null, lng = null) => {
       price_per_player AS pp
     FROM sala_precio
     WHERE id_sala = $1
+      AND source IS DISTINCT FROM 'seed_auto'
     ORDER BY players ASC
   `;
   const { rows: precios } = await db.query(precioQuery, [id_sala]);

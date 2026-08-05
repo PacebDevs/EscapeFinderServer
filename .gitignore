@@ -4,3 +4,5 @@
 # Ignorar mapas generados
 src/uploads/maps/
 
+# Datos locales de preproducción (se recrean fuera de Git)
+runtime/pre/

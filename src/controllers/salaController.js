@@ -35,6 +35,16 @@ exports.getFilteredSalas = async (req, res) => {
       if (!Number.isNaN(n)) filters.precio = n;
       else delete filters.precio;
     }
+
+    if (
+      filters.precio !== undefined &&
+      (!Number.isInteger(filters.jugadores) || filters.jugadores <= 0)
+    ) {
+      return res.status(400).json({
+        error: 'Selecciona el número de jugadores para filtrar por precio por persona.',
+        code: 'PRICE_REQUIRES_PLAYERS',
+      });
+    }
   
    
     if (filters.tipo_sala) {

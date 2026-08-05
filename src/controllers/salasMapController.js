@@ -49,6 +49,15 @@ exports.getSalasMap = async (req, res) => {
       const n = parseFloat(filters.precio.replace(',', '.'));
       if (!Number.isNaN(n)) filters.precio = n; else delete filters.precio;
     }
+    if (
+      filters.precio !== undefined &&
+      (!Number.isInteger(filters.jugadores) || filters.jugadores <= 0)
+    ) {
+      return res.status(400).json({
+        error: 'Selecciona el número de jugadores para filtrar por precio por persona.',
+        code: 'PRICE_REQUIRES_PLAYERS',
+      });
+    }
     if (filters.tipo_sala) {
       if (Array.isArray(filters.tipo_sala)) filters.tipo_sala = filters.tipo_sala.map(t => t.trim());
       else if (typeof filters.tipo_sala === 'string') filters.tipo_sala = filters.tipo_sala.split(',').map(t => t.trim());

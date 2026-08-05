@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { buildPriceFilter } = require('./priceFilter');
 
 // Recibe normalizedFilters con la misma forma que en getFilteredSalas (sin limit/offset)
 exports.getSalasForMap = async (normalizedFilters) => {
@@ -40,15 +41,16 @@ exports.getSalasForMap = async (normalizedFilters) => {
       s.nombre,
       s.dificultad,
       ${distanciaSelect}
-      v.min_pp AS precio_min_pp,
-      v.max_pp AS precio_max_pp,
-      v.min_total AS precio_min_total,
-      v.max_total AS precio_max_total,
-      CASE
-        WHEN v.min_pp IS NOT NULL OR v.max_pp IS NOT NULL THEN 'por_persona'
-        WHEN v.min_total IS NOT NULL OR v.max_total IS NOT NULL THEN 'total'
-        ELSE NULL
-      END AS tipo_precio,
+      v.publicado_min_pp AS precio_min_pp,
+      v.publicado_max_pp AS precio_max_pp,
+      v.publicado_min_total AS precio_min_total,
+      v.publicado_max_total AS precio_max_total,
+      v.tipo_precio_publicado AS tipo_precio,
+      v.publicado_source AS precio_publicado_source,
+      v.detalle_min_pp AS precio_detalle_min_pp,
+      v.detalle_max_pp AS precio_detalle_max_pp,
+      v.detalle_min_total AS precio_detalle_min_total,
+      v.detalle_max_total AS precio_detalle_max_total,
       d.latitud,
       d.longitud,
       d.ciudad,
@@ -63,7 +65,7 @@ exports.getSalasForMap = async (normalizedFilters) => {
     FROM sala s
     JOIN local l ON s.id_local = l.id_local
     JOIN empresa e ON e.id_empresa = l.id_empresa
-    LEFT JOIN sala_precio_minmax v ON v.id_sala = s.id_sala
+    LEFT JOIN sala_precio_resumen v ON v.id_sala = s.id_sala
     LEFT JOIN direccion d ON d.id_local = l.id_local
 
     -- joins para filtros (mismos que ya usas)
@@ -129,50 +131,14 @@ exports.getSalasForMap = async (normalizedFilters) => {
     query += ` AND s.actores = true`;
   }
 
-  // Precio por persona (misma lógica con sala_precio / minmax) :contentReference[oaicite:10]{index=10}
-  if (normalizedFilters.precio_pp !== null) {
-    if (normalizedFilters.jugadores !== null) {
-      const precioIdx = idx++;
-      const playersIdx = idx++;
-      query += `
-        AND (
-          EXISTS (
-            SELECT 1
-            FROM sala_precio sp
-            WHERE sp.id_sala = s.id_sala
-              AND sp.players = $${playersIdx}
-              AND sp.price_per_player <= $${precioIdx}
-          )
-          OR (
-            NOT EXISTS (
-              SELECT 1
-              FROM sala_precio sp2
-              WHERE sp2.id_sala = s.id_sala
-                AND sp2.players = $${playersIdx}
-            )
-            AND EXISTS (
-              SELECT 1
-              FROM sala_precio_minmax v3
-              WHERE v3.id_sala = s.id_sala
-                AND v3.max_pp <= $${precioIdx}
-            )
-          )
-        )
-      `;
-      values.push(normalizedFilters.precio_pp, normalizedFilters.jugadores);
-    } else {
-      const precioIdx = idx++;
-      query += `
-        AND EXISTS (
-          SELECT 1
-          FROM sala_precio_minmax v2
-          WHERE v2.id_sala = s.id_sala
-            AND v2.max_pp <= $${precioIdx}
-        )
-      `;
-      values.push(normalizedFilters.precio_pp);
-    }
-  }
+  const priceFilter = buildPriceFilter({
+    pricePerPlayer: normalizedFilters.precio_pp,
+    players: normalizedFilters.jugadores,
+    startIndex: idx,
+  });
+  query += priceFilter.sql;
+  values.push(...priceFilter.values);
+  idx = priceFilter.nextIndex;
 
   // Accesibilidad (opt-in, es_apta = true) — misma subquery/semántica
   if (normalizedFilters.accesibilidad.length > 0) {
@@ -240,7 +206,10 @@ exports.getSalasForMap = async (normalizedFilters) => {
   // Agrupación mínima para evitar duplicados por los LEFT JOIN de filtros
   query += `
     GROUP BY s.id_sala, d.id_direccion, d.tipo_via, d.nombre_via, d.numero, d.ampliacion,
-             d.codigo_postal, v.min_pp, v.max_pp, v.min_total, v.max_total, e.nombre, c.nombre
+             d.codigo_postal, v.publicado_min_pp, v.publicado_max_pp, v.publicado_min_total,
+             v.publicado_max_total, v.tipo_precio_publicado, v.publicado_source,
+             v.detalle_min_pp, v.detalle_max_pp, v.detalle_min_total, v.detalle_max_total,
+             e.nombre, c.nombre
     ORDER BY s.nombre ASC
   `;
 
