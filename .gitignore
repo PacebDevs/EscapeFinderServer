@@ -6,3 +6,8 @@ src/uploads/maps/
 
 # Datos locales de preproducción (se recrean fuera de Git)
 runtime/pre/
+
+# Herramientas y documentación locales de cambio de entorno
+scripts/use-dev.ps1
+scripts/use-pre.ps1
+GUIA_CAMBIO_ENTORNOS.md
