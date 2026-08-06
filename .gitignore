@@ -11,3 +11,8 @@ runtime/pre/
 scripts/use-dev.ps1
 scripts/use-pre.ps1
 GUIA_CAMBIO_ENTORNOS.md
+
+# Configuración local y secretos
+.env
+.env.*
+!.env.example
