@@ -13,6 +13,7 @@ const server = http.createServer(app);
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const favoritoRoutes = require('./routes/favoritoRoutes');
+const redis = require('./cache/redisClient');
 
 // Lista de orígenes permitidos
 const allowedOrigins = [
@@ -44,6 +45,35 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+app.get('/health', async (_req, res) => {
+  const checks = {
+    api: 'ok',
+    database: 'error',
+    redis: 'error'
+  };
+
+  try {
+    await db.query('SELECT 1');
+    checks.database = 'ok';
+  } catch (error) {
+    console.error('❌ Health check PostgreSQL:', error.message);
+  }
+
+  try {
+    await redis.ping();
+    checks.redis = 'ok';
+  } catch (error) {
+    console.error('❌ Health check Redis:', error.message);
+  }
+
+  const healthy = checks.database === 'ok' && checks.redis === 'ok';
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
+    checks
+  });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/favoritos', favoritoRoutes);

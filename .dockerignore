@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+node_modules
+logs
+runtime
+*.log
+*.sql
+*.dump
+proyecto_dump.txt
+src/proyecto_dump.txt
+src/uploads

@@ -8,7 +8,7 @@
     "migrate:prices": "node src/scripts/migratePriceSemantics.js",
     "update-images": "node src/scripts/updateImages.js",
     "updateAndRefactorImages": "node src/scripts/updateAndRefactorImages.js",
-    "start": "node index.js",
+    "start": "node src/index.js",
     "geocode": "node src/scripts/geocode_direcciones.js"
   },
   "dependencies": {
