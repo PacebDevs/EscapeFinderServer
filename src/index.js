@@ -15,28 +15,43 @@ const userRoutes = require('./routes/userRoutes');
 const favoritoRoutes = require('./routes/favoritoRoutes');
 const redis = require('./cache/redisClient');
 
-// Lista de orígenes permitidos
-const allowedOrigins = [
-  'http://localhost:8100',     // ionic serve (puerto por defecto)
-  'http://localhost:8101',     // ionic serve (puerto alternativo)
-  'http://192.168.1.131:8100', // live-reload en dispositivo real
-  'http://localhost',          // emulador Android
-  'capacitor://localhost',     // Capacitor WebView iOS/Android
-  'ionic://localhost',          // variante en algunas versiones
-  'http://192.168.1.201:8100',
-  'http://localhost:3000',     // backend HTML pages (localhost)
-  'http://192.168.1.131:3000'  // backend HTML pages (IP local)
+const mobileOrigins = [
+  'http://localhost',
+  'capacitor://localhost',
+  'ionic://localhost'
 ];
 
-if (process.env.USE_NGROK === 'true' && process.env.NGROK_URL) {
-  allowedOrigins.push(process.env.NGROK_URL);
+const developmentOrigins = [
+  'http://localhost:8100',
+  'http://localhost:8101',
+  'http://192.168.1.131:8100',
+  'http://192.168.1.201:8100',
+  'http://localhost:3000',
+  'http://192.168.1.131:3000'
+];
+
+const configuredOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = new Set([...mobileOrigins, ...configuredOrigins]);
+
+if (process.env.NODE_ENV !== 'production') {
+  developmentOrigins.forEach((origin) => allowedOrigins.add(origin));
 }
+
+if (process.env.USE_NGROK === 'true' && process.env.NGROK_URL) {
+  allowedOrigins.add(process.env.NGROK_URL);
+}
+
+const isOriginAllowed = (origin) => !origin || allowedOrigins.has(origin);
 
 // Middleware CORS para Express
 app.use(cors({
   origin(origin, callback) {
     // permitimos si no hay origin (p. ej. sockets internos)
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (isOriginAllowed(origin)) {
       return callback(null, true);
     }
     callback(new Error(`Origen no permitido por CORS: ${origin}`));
@@ -710,7 +725,7 @@ app.get('/reset-password', (req, res) => {
 const io = new Server(server, {
   cors: {
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isOriginAllowed(origin)) {
         return callback(null, true);
       }
       callback(new Error(`Origen no permitido por Socket.io CORS: ${origin}`));
