@@ -1,16 +1,36 @@
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
 
+const smtpPort = Number.parseInt(process.env.SMTP_PORT || '465', 10);
+const smtpUser = process.env.SMTP_USER ?? process.env.EMAIL_USER;
+const smtpPassword = process.env.SMTP_PASSWORD ?? process.env.EMAIL_PASS;
+const emailFrom = process.env.EMAIL_FROM || smtpUser;
+
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.SMTP_HOST || 'smtp.zoho.eu',
+  port: smtpPort,
+  secure: process.env.SMTP_SECURE
+    ? process.env.SMTP_SECURE === 'true'
+    : smtpPort === 465,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
+    user: smtpUser,
+    pass: smtpPassword
   }
 });
+
+function assertEmailConfiguration() {
+  const missingVariables = [];
+
+  if (!smtpUser) missingVariables.push('SMTP_USER');
+  if (!smtpPassword) missingVariables.push('SMTP_PASSWORD');
+  if (!Number.isInteger(smtpPort) || smtpPort <= 0) {
+    missingVariables.push('SMTP_PORT');
+  }
+
+  if (missingVariables.length > 0) {
+    throw new Error(`Configuracion SMTP incompleta: ${missingVariables.join(', ')}`);
+  }
+}
 
 function escapeHtml(value = '') {
   return String(value)
@@ -81,6 +101,8 @@ function buildBrandedEmail({
 }
 
 async function enviarEmailVerificacion(usuario) {
+  assertEmailConfiguration();
+
   const token = jwt.sign(
     { 
       id_usuario: usuario.id_usuario,
@@ -95,7 +117,7 @@ async function enviarEmailVerificacion(usuario) {
   const nombreUsuario = usuario.nombre || 'explorador';
 
   const mailOptions = {
-    from: `"EscapeFinder" <${process.env.EMAIL_USER}>`,
+    from: `"EscapeFinder" <${emailFrom}>`,
     to: usuario.email,
     subject: 'Confirma tu cuenta y empieza a explorar | EscapeFinder',
     text: `Hola ${nombreUsuario},\n\nTu aventura en EscapeFinder empieza aqui.\nConfirma tu cuenta desde este enlace: ${urlVerificacion}\n\nEste enlace expira en 24 horas. Si no creaste esta cuenta, puedes ignorar este mensaje.`,
@@ -125,11 +147,13 @@ async function enviarEmailVerificacion(usuario) {
  * Envía email de recuperación de contraseña
  */
 async function enviarEmailRecuperacion(usuario, token) {
+  assertEmailConfiguration();
+
   const urlRecuperacion = `${process.env.BASE_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
   const nombreUsuario = usuario.nombre || 'explorador';
 
   const mailOptions = {
-    from: `"EscapeFinder" <${process.env.EMAIL_USER}>`,
+    from: `"EscapeFinder" <${emailFrom}>`,
     to: usuario.email,
     subject: 'Restablece tu acceso de forma segura | EscapeFinder',
     text: `Hola ${nombreUsuario},\n\nRecibimos una solicitud para restablecer tu contrasena en EscapeFinder.\nHazlo desde este enlace: ${urlRecuperacion}\n\nEste enlace expira en 1 hora. Si no solicitaste el cambio, ignora este correo y manten tu cuenta protegida.`,
